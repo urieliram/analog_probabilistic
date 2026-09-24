@@ -1,23 +1,32 @@
-"""Carga de la serie de precios del nodo San Juan del Río."""
+"""Carga de las series de precio publicadas en data/nodes."""
 
 from pathlib import Path
 
 import pandas as pd
 
-DATA_FILE = (Path(__file__).resolve().parents[1] / "data"
-             / "san_juan_del_rio_lmp_hourly.csv")
+NODES_DIR = Path(__file__).resolve().parents[1] / "data" / "nodes"
+PAPER_NODE = "san_juan_del_rio"
 
 
-def load_series(column: str = "pml_mda") -> pd.Series:
+def available_nodes() -> list:
+    """Nombres de los nodos que trae el repositorio."""
+    return sorted(path.name[:-len(".csv.gz")] for path in NODES_DIR.glob("*.csv.gz"))
+
+
+def load_node(node: str = PAPER_NODE) -> pd.DataFrame:
+    """Las ocho series del nodo, tal como se publicaron."""
+    return pd.read_csv(NODES_DIR / f"{node}.csv.gz", parse_dates=["ds"]).set_index("ds")
+
+
+def load_series(column: str = "pml_mda", node: str = PAPER_NODE) -> pd.Series:
     """
-    Devuelve la serie horaria pedida, sin huecos.
+    Devuelve la serie pedida, horaria y sin huecos.
 
-    El archivo trae las ocho series del nodo. Las cuatro del mercado en tiempo
-    real terminan antes que las del día en adelanto porque el operador las
-    publica con retraso, y el día en adelanto tiene cuatro horas ausentes por
-    fallas de publicación: se rellenan por interpolación lineal.
+    Las series del mercado en tiempo real terminan antes que las del día en
+    adelanto porque el operador las publica con retraso, y el día en adelanto
+    tiene algunas horas ausentes por fallas de publicación: se rellenan por
+    interpolación lineal.
     """
-    frame = pd.read_csv(DATA_FILE, parse_dates=["ds"]).set_index("ds")
-    series = frame[column].astype(float).dropna()
+    series = load_node(node)[column].astype(float).dropna()
     hours = pd.date_range(series.index.min(), series.index.max(), freq="h")
     return series.reindex(hours).interpolate(limit_direction="both")

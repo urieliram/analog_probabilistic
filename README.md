@@ -37,7 +37,7 @@ pip install -r requirements.txt
 import pandas as pd
 from analog_probabilistic import AnalogProbabilistic
 
-prices = pd.read_csv("data/san_juan_del_rio_lmp_hourly.csv",
+prices = pd.read_csv("data/nodes/san_juan_del_rio.csv.gz",
                      parse_dates=["ds"]).set_index("ds")["pml_mda"]
 
 model = AnalogProbabilistic(window=48, k=40).fit(prices.values)
@@ -51,19 +51,32 @@ buyer uses.
 
 ## Data
 
-`data/san_juan_del_rio_lmp_hourly.csv` holds the complete published history of
-the San Juan del Río node of the Mexican wholesale electricity market:
+`data/nodes/` holds the hourly price history of fourteen nodes of the Mexican
+wholesale electricity market, one gzipped CSV per node, about 1.1 million
+node-hours in total. `data/nodes_index.csv` lists them with their period and
+size. Each file has the same eight columns: the locational marginal price and
+its three components — energy, losses and congestion — for the day-ahead
+(`_mda`) and the real-time (`_mtr`) markets, in Mexican pesos per megawatt-hour.
 
-- 74,276 hourly observations, 4 April 2018 to 23 September 2026
-- eight series: the locational marginal price and its three components (energy,
-  losses, congestion) for the day-ahead (`_mda`) and real-time (`_mtr`) markets
-- prices in Mexican pesos per megawatt-hour
-- source: CENACE, the national energy control centre, public information system
+| node | kind | hours | period |
+|---|---|---|---|
+| `Mexican_Oriente` | market node | 93,422 | 2016-01-27 to 2026-09-23 |
+| `05LGA-115`, `06CDU-400`, `06MES-400`, `06PAE-400` | market nodes | 90,858 each | 2016-01-29 to 2026-06-10 |
+| `iguala`, `monclova`, `san_juan_del_rio` | zonal averages | 74,276 each | 2018-04-04 to 2026-09-23 |
+| `juarez`, `leon`, `monterrey`, `piedras_negras`, `reynosa` | zonal averages | 71,756 each | 2018-04-04 to 2026-06-10 |
+| `03POM-400` | market node | 49,510 | 2020-10-17 to 2026-06-10 |
 
-Two gaps are worth knowing. The day-ahead series has four missing hours caused
-by publication failures; the experiments fill them by linear interpolation. The
-real-time series ends earlier than the day-ahead one, because the operator
-publishes it with a lag.
+The paper uses `san_juan_del_rio`, day-ahead price.
+
+Three things are worth knowing before using the files. The day-ahead series
+have a handful of missing hours caused by publication failures, which the
+experiments fill by linear interpolation. The real-time series end earlier than
+the day-ahead ones, because the operator publishes them with a lag. And the
+collection for several nodes stopped in June 2026, so their series end there.
+
+The source is CENACE, the national energy control centre, through its public
+information system. Demand series are deliberately absent from this
+repository.
 
 ## Reproducing the experiments
 
