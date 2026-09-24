@@ -77,7 +77,8 @@ python experiments/tables.py         # paper/tables/*.tex
 python experiments/figures.py        # paper/figs/*.pdf
 ```
 
-`backtest.py` is what takes the time, and almost all of it goes to AutoARIMA.
+`backtest.py` is what takes the time, and all but a minute of it goes to
+AutoARIMA.
 The results already in `results/` were produced on an Intel Core i7-11700 with
 64 GB of RAM under Python 3.10.
 
@@ -88,12 +89,12 @@ Rolling origins every two days from 1 March to 31 August 2026, horizon 24 h,
 
 | Method | CRPS | Δ reliability | Sharp. 95% | Cov. 95% | Winkler | MAE | Pinball 0.95 | Time |
 |---|---|---|---|---|---|---|---|---|
-| Analog-Prob | **62.3** | 0.216 | **515** | 0.778 | **1139** | **156.2** | **39.3** | 1.27 |
-| Analog ensemble (`raw`) | 79.0 | 0.257 | 806 | 0.815 | 1591 | 197.2 | 62.8 | 1.26 |
-| AutoARIMA | 80.2 | 0.210 | 816 | 0.907 | 1657 | 193.9 | 53.6 | 82.81 |
-| Seasonal naive | 81.8 | **0.181** | 848 | 0.904 | 1945 | 173.4 | 51.4 | 0.02 |
-| Theta | 98.3 | 0.215 | 1394 | 0.936 | 1884 | 208.0 | 43.1 | 0.19 |
-| LightGBM quantile | 68.0 | 0.227 | 445 | 0.686 | 1349 | 171.2 | 47.5 | 0.09 |
+| Analog-Prob | **62.3** | 0.216 | **515** | 0.778 | **1139** | **156.2** | **39.3** | 0.027 |
+| Analog ensemble (`raw`) | 79.0 | 0.257 | 806 | 0.815 | 1591 | 197.2 | 62.8 | 0.020 |
+| AutoARIMA | 80.2 | 0.210 | 816 | 0.907 | 1657 | 193.9 | 53.6 | 65.703 |
+| Seasonal naive | 81.8 | **0.181** | 848 | 0.904 | 1945 | 173.4 | 51.4 | **0.017** |
+| Theta | 98.3 | 0.215 | 1394 | 0.936 | 1884 | 208.0 | 43.1 | 0.171 |
+| LightGBM quantile | 68.0 | 0.227 | 445 | 0.686 | 1349 | 171.2 | 47.5 | 0.044 |
 
 Every difference in CRPS favours the analog method and is significant by a
 one-sided Diebold-Mariano test; the closest, against LightGBM, gives p = 0.026.
@@ -112,9 +113,10 @@ Three findings deserve to be read together with the table:
    one-week window with 20 analogs gives the best score; the configuration
    fixed in advance (48 hours, 40 analogs) lands 4.6% above it.
 
-The timings above come from the loop-based search used for the paper. The
-vectorized search in this package returns the same ensemble to within 5e-13 and
-is about fifty times faster.
+The analog method is also 2,400 times faster than AutoARIMA, which it beats on
+every score. The search compares the present window against every candidate in
+one matrix product; the loop-based version used while the method was developed
+returns the same ensemble to within 5e-13 and takes about fifty times longer.
 
 ## Paper
 

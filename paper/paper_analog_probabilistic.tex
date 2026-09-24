@@ -128,9 +128,9 @@ hourly electricity prices of a node of the Mexican wholesale market against a
 seasonal benchmark, an exponential smoothing method, an automatically selected
 autoregressive model and a quantile gradient boosting. Against all four of them it attains the best
 score of every kind measured here, including the loss on the expensive side of
-the distribution that a buyer actually pays, and it does so in about one
-sixty-fifth of the time the autoregressive model needs; every difference is
-statistically significant. Its intervals are nevertheless too narrow: the
+the distribution that a buyer actually pays, and it does so in a few
+hundredths of a second, some two thousand times faster than the autoregressive
+model; every difference is statistically significant. Its intervals are nevertheless too narrow: the
 nominal ninety-five per cent interval covers seventy-eight per cent of the
 observations. A recalibration that uses only the errors of past forecast
 origins restores most of the missing coverage without improving the score. Two
@@ -479,10 +479,11 @@ falls outside it, and the pinball loss at $\alpha=0.95$ alone, which is the
 score a buyer who hedges against high prices actually pays.
 
 \paragraph{Cost.} Wall-clock seconds to produce one complete set of $19$
-quantiles over the horizon, measured on a single core. The analog search is
-implemented as a plain loop over candidate windows; a vectorized search would
-reduce the figures reported here, so they should be read as an upper bound on
-the cost of the method.
+quantiles over the horizon, measured on a single core. The analog search
+compares the present window against every candidate window in one matrix
+product rather than one comparison at a time; the two give the same ensemble to
+within rounding, and the reported figures are those of the released
+implementation.
 
 Relative errors are avoided throughout: the series takes values near and below
 zero, so percentage scores such as MAPE are not defined on it.
@@ -805,8 +806,8 @@ candidate windows and not for the regressions.
 \label{sec:discussion}
 
 The result we consider most useful for operation is not the ranking but the
-combination of the ranking with the cost column. A method that produces a
-calibrated distribution in a fraction of a second can be run for every node of
+combination of the ranking with the cost column. A method that produces a full
+predictive distribution in hundredths of a second can be run for every node of
 a portfolio, every hour, on ordinary hardware, and can be re-run when new
 information arrives. That was already the argument for the point version of
 the analog method \citep{LezamaLope2023}, and it survives the move to
