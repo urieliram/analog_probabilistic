@@ -1,0 +1,14 @@
+{
+  "gamma": 0.0,
+  "criterio": "mean_pinball",
+  "regla": "un error estándar sobre la media por origen, desempate por la celda más simple",
+  "puntaje_elegida": 61.194260929385706,
+  "puntaje_mejor": 60.98610007187329,
+  "umbral": 66.40609662399748,
+  "celdas_dentro_del_umbral": 11,
+  "tramo": [
+    "2020-04-01",
+    "2021-03-31"
+  ],
+  "origenes": 364
+}

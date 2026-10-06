@@ -88,7 +88,7 @@ def main() -> None:
             "criterio": PUNTAJE,
             "regla": "un error estándar sobre la media por origen, desempate "
                      "por la celda más simple",
-            "puntaje_elegida": float(elegida[PUNTAJE]),
+            "puntaje_elegida": float(elegida["puntaje"]),
             "puntaje_mejor": float(resumen.puntaje.min()),
             "umbral": fallo["umbral"],
             "celdas_dentro_del_umbral": int(len(dentro)),
