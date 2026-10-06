@@ -1,0 +1,43 @@
+{
+  "zonas": [
+    "caborca",
+    "centro_oriente",
+    "centro_sur",
+    "chihuahua",
+    "chilpancingo",
+    "coatzacoalcos",
+    "culiacan",
+    "durango",
+    "fresnillo",
+    "hermosillo",
+    "ixmiquilpan",
+    "mazatlan",
+    "merida",
+    "navojoa",
+    "nuevo_laredo",
+    "obregon",
+    "poza_rica",
+    "tampico",
+    "tecamachalco",
+    "tepic_vallarta",
+    "teziutlan",
+    "veracruz",
+    "victoria",
+    "villahermosa",
+    "zamora"
+  ],
+  "n_zonas": 25,
+  "n_grupos": 22,
+  "umbral": 0.85,
+  "factor_comun": 0.85,
+  "obligatorias": {
+    "obregon": "spike_rate",
+    "caborca": "congestion_share",
+    "mazatlan": "negative_rate"
+  },
+  "tramo": [
+    "2018-04-04",
+    "2021-03-31"
+  ],
+  "zonas_evaluadas": 101
+}

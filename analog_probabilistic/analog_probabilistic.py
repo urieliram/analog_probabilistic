@@ -56,7 +56,7 @@ def find_analogs(
     no se llene de copias corridas del mismo episodio.
     """
     n = len(series)
-    if n < 2 * window + 1:
+    if n < 2 * window + horizon:
         raise ValueError("serie demasiado corta para la ventana y el horizonte")
 
     present = series[n - window:]
@@ -65,8 +65,14 @@ def find_analogs(
 
     ## una sola pasada vectorizada sobre todas las ventanas candidatas: con
     ## series de decenas de miles de puntos, el lazo equivalente en Python
-    ## domina el tiempo del método entero
-    last = n - 2 * window
+    ## domina el tiempo del método entero.
+    ##
+    ## El último candidato admisible es el que cumple p + ventana + horizonte <=
+    ## n - ventana: así la continuación del análogo termina ANTES de que empiece
+    ## la ventana presente. Sin esa condición se cuela un miembro degenerado: el
+    ## análogo inmediatamente anterior, cuya continuación es el presente mismo y
+    ## cuyo mapa se ajustó justo para reproducirlo.
+    last = n - 2 * window - horizon + 1
     strides = np.lib.stride_tricks.sliding_window_view(series[:last + window],
                                                        window)
     candidates = strides[:last]
@@ -111,21 +117,36 @@ def member_map(
     present: np.ndarray,
     similarity: float,
     map_name: str = "ols",
+    gamma: Optional[float] = None,
 ) -> tuple[float, float]:
-    """Devuelve la ordenada y la pendiente que llevan el análogo al presente."""
-    if map_name not in AVAILABLE_MAPS:
-        raise ValueError(f"mapa desconocido: {map_name}")
+    """
+    Devuelve la ordenada y la pendiente que llevan el análogo al presente.
 
-    if map_name == "raw":
-        return 0.0, 1.0
+    La pendiente es ``rho^gamma * sy / sx``. El exponente gamma gradúa cuánto se
+    contrae cada miembro hacia el nivel medio del presente: con gamma = 1 son los
+    mínimos cuadrados y con gamma = 0 el reescalado de patrón. Los nombres de
+    ``AVAILABLE_MAPS`` son posiciones particulares de esa misma familia y se
+    conservan por conveniencia; ``gamma`` tiene precedencia si se da.
+
+    La contracción importa porque los análogos se seleccionaron por tener una
+    correlación alta, y volver a usar esa correlación para encoger la pendiente
+    estrecha un ensamble que ya venía estrecho: la varianza que cada miembro
+    transmite queda multiplicada por rho^(2*gamma).
+    """
+    if gamma is None:
+        if map_name not in AVAILABLE_MAPS:
+            raise ValueError(f"mapa desconocido: {map_name}")
+        if map_name == "raw":
+            return 0.0, 1.0
+        gamma = 1.0 if map_name == "ols" else 0.0
 
     scale_x = float(np.std(analog_window))
     if scale_x == 0:
         return 0.0, 1.0
 
     slope = float(np.std(present)) / scale_x
-    if map_name == "ols":
-        slope *= similarity
+    if gamma:
+        slope *= float(similarity) ** gamma
 
     intercept = float(np.mean(present)) - slope * float(np.mean(analog_window))
     return intercept, slope
@@ -139,6 +160,7 @@ def build_ensemble(
     separation: float = 0.5,
     map_name: str = "ols",
     clip: bool = True,
+    gamma: Optional[float] = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Construye el ensamble de trayectorias y los pesos de sus miembros.
@@ -149,6 +171,9 @@ def build_ensemble(
     decisión conservadora que censura la cola derecha y conviene apagar cuando
     lo que se busca es justamente avisar de un extremo.
     """
+    if horizon > window:
+        raise ValueError("el horizonte no puede exceder la ventana presente")
+
     analogs = find_analogs(series, window, horizon, k, separation)
     present = series[len(series) - window:]
 
@@ -160,7 +185,8 @@ def build_ensemble(
     for analog_window, future, similarity in zip(
         analogs.windows, analogs.futures, analogs.similarities
     ):
-        intercept, slope = member_map(analog_window, present, similarity, map_name)
+        intercept, slope = member_map(analog_window, present, similarity,
+                                      map_name, gamma)
         projected = future if not clip else np.clip(future, low_input, high_input)
         member = intercept + slope * projected
         if clip:

@@ -3,6 +3,12 @@ __pycache__/
 .ipynb_checkpoints/
 .venv/
 
+## las 101 zonas completas pesan 107 MB y se reconstruyen con build_panel.py:
+## al repositorio va sólo el panel elegido, y el archivo completo a un depósito
+## con identificador permanente
+data/zones/
+data/zones_index.csv
+
 paper/*.aux
 paper/*.bbl
 paper/*.blg
