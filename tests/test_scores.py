@@ -94,3 +94,68 @@ def test_wis_y_pinball_miden_lo_mismo_salvo_un_factor():
     razon = (weighted_interval_score(observado, base, niveles)
              / mean_pinball(observado, base, niveles))
     assert 1.5 < razon < 2.5
+
+
+## ---------------------------------------------------------------------------
+## Puntajes de trayectoria
+## ---------------------------------------------------------------------------
+
+from experiments.trajectory_scores import (energy_score,  # noqa: E402
+                                           paths_gaussian_copula,
+                                           paths_independent, variogram_score)
+
+
+def test_el_puntaje_de_energia_de_un_ensamble_exacto_es_cero():
+    observado = np.array([1.0, 2.0, 3.0])
+    miembros = np.tile(observado, (8, 1))
+    assert energy_score(observado, miembros) == pytest.approx(0.0)
+
+
+def test_el_puntaje_de_energia_se_reduce_al_crps_en_una_dimension():
+    from experiments.scores import crps_ensemble
+    rng = np.random.default_rng(1)
+    miembros = rng.normal(size=(30, 1))
+    observado = np.array([0.3])
+    assert energy_score(observado, miembros) == pytest.approx(
+        crps_ensemble(observado, miembros), rel=1e-9)
+
+
+def test_el_variograma_premia_tener_la_dependencia_correcta():
+    """
+    Dos ensambles con la misma distribución por hora y distinta dependencia.
+
+    El que conserva la relación entre horas tiene que puntuar mejor; un puntaje
+    que no distinga eso no sirve para sostener la afirmación del artículo.
+    """
+    rng = np.random.default_rng(5)
+    base = rng.normal(size=100)
+    ## lo observado sube suave: horas vecinas parecidas
+    observado = np.cumsum(rng.normal(size=24)) * 0.1
+
+    con_dependencia = np.array([np.cumsum(rng.normal(size=24)) * 0.1
+                                for _ in range(100)])
+    sin_dependencia = con_dependencia.copy()
+    for paso in range(24):
+        rng.shuffle(sin_dependencia[:, paso])
+
+    assert (variogram_score(observado, con_dependencia)
+            < variogram_score(observado, sin_dependencia))
+
+
+def test_los_caminos_independientes_respetan_los_cuantiles_marginales():
+    niveles = [0.1, 0.3, 0.5, 0.7, 0.9]
+    cuantiles = np.array([[-2.0], [-1.0], [0.0], [1.0], [2.0]])
+    caminos = paths_independent(cuantiles, niveles, n_paths=20000, seed=1)
+    assert np.median(caminos) == pytest.approx(0.0, abs=0.05)
+    assert caminos.min() >= -2.0 and caminos.max() <= 2.0
+
+
+def test_la_copula_produce_caminos_correlacionados():
+    niveles = [0.1, 0.5, 0.9]
+    cuantiles = np.tile(np.array([[-1.0], [0.0], [1.0]]), (1, 3))
+    correlacion = np.full((3, 3), 0.9)
+    np.fill_diagonal(correlacion, 1.0)
+    caminos = paths_gaussian_copula(cuantiles, niveles, correlacion,
+                                    n_paths=4000, seed=2)
+    observada = np.corrcoef(caminos.T)[0, 1]
+    assert observada > 0.6
