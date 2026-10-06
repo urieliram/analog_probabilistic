@@ -17,3 +17,8 @@ paper/*.out
 paper/*.synctex.gz
 paper/paper_analog_probabilistic.pdf
 results/*.log
+
+## los pronósticos crudos pesan cientos de megabytes y se regeneran con
+## run_forecasts.py: al repositorio van los puntajes, que es lo que el artículo usa
+results/*.parquet
+results/forecasts_*/

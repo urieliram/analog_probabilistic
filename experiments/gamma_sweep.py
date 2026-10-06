@@ -81,7 +81,9 @@ def main() -> None:
             for gamma, miembros in miembros_por_gamma(
                     historia, analogos, presente, GAMMA_GRID, limites).items():
                 cuantiles = ensemble_quantiles(miembros, LEVELS)
-                filas.append({"zona": zona, "origen": origen, "gamma": gamma,
+                filas.append({"zona": zona, "origen": origen,
+                              "gamma": gamma, "window": WINDOW, "k": K,
+                              "separation": SEPARATION,
                               "k_real": len(miembros),
                               **evaluate(observado, cuantiles, LEVELS, miembros)})
 

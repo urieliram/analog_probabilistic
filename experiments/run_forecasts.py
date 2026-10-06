@@ -21,7 +21,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from analog_probabilistic.analog_probabilistic import (  # noqa: E402
-    build_ensemble, ensemble_quantiles)
+    ensemble_quantiles, find_analogs, member_map)
 from experiments.forecast_store import ForecastStore  # noqa: E402
 from experiments.protocol import (HORIZON, RESULTS, SEARCH_YEARS,  # noqa: E402
                                   SELECTION_END, SELECTION_START, TEST_END,
@@ -36,13 +36,36 @@ TRAMOS = {
 }
 
 
-def pronostico_analogo(historia: np.ndarray, config: dict, gamma: float = None):
-    """Cuantiles y miembros del ensamble de análogos."""
-    miembros, _ = build_ensemble(
-        historia, window=int(config["window"]), horizon=HORIZON,
-        k=int(config["k"]), separation=float(config["separation"]),
-        gamma=float(config["gamma"] if gamma is None else gamma))
-    return ensemble_quantiles(miembros, LEVELS), miembros
+def ensambles_por_gamma(historia: np.ndarray, config: dict, gammas: dict):
+    """
+    Un ensamble por cada valor de gamma, con UNA sola búsqueda de análogos.
+
+    La búsqueda es todo el costo del método: repetirla por variante duplicaba el
+    tiempo de la corrida sin aportar nada, porque las variantes comparten los
+    mismos análogos y sólo difieren en la pendiente del mapa.
+    """
+    ventana = int(config["window"])
+    analogos = find_analogs(historia, ventana, HORIZON, int(config["k"]),
+                            float(config["separation"]))
+    presente = historia[len(historia) - ventana:]
+
+    entrada = (float(historia.min()), float(historia.max()))
+    salida = (float(np.percentile(historia, 1)) - 2 * float(historia.std()),
+              float(historia.max()))
+
+    salidas = {}
+    for nombre, gamma in gammas.items():
+        valor = float(config["gamma"] if gamma is None else gamma)
+        miembros = []
+        for ventana_analoga, futuro, parecido in zip(
+                analogos.windows, analogos.futures, analogos.similarities):
+            ordenada, pendiente = member_map(ventana_analoga, presente, parecido,
+                                             gamma=valor)
+            proyectado = np.clip(futuro, *entrada)
+            miembros.append(np.clip(ordenada + pendiente * proyectado, *salida))
+        miembros = np.array(miembros)
+        salidas[nombre] = (ensemble_quantiles(miembros, LEVELS), miembros)
+    return salidas
 
 
 def main() -> None:
@@ -79,20 +102,23 @@ def main() -> None:
                                   origen + pd.Timedelta(hours=HORIZON)].values
             if len(observado) != HORIZON:
                 continue
-            for nombre, gamma in variantes.items():
-                reloj = time.time()
-                try:
-                    cuantiles, miembros = pronostico_analogo(historia, config,
-                                                             gamma)
-                except ValueError:
-                    continue
+            reloj = time.time()
+            try:
+                salidas = ensambles_por_gamma(historia, config, variantes)
+            except ValueError:
+                continue
+            ## el reloj se reparte entre las variantes: comparten la búsqueda, que
+            ## es casi todo lo que cuesta
+            por_variante = (time.time() - reloj) / len(salidas)
+            for nombre, (cuantiles, miembros) in salidas.items():
                 almacen.add(zona, origen, nombre, cuantiles, observado,
-                            miembros, time.time() - reloj)
+                            miembros, por_variante)
+        parte = almacen.flush(zona)
         print(f"  {numero}/{len(zonas)} {zona:20s} "
-              f"{time.time() - comienzo:6.0f}s", flush=True)
+              f"{time.time() - comienzo:6.0f}s  {parte.get('filas', 0):,d} filas",
+              flush=True)
 
-    escrito = almacen.save()
-    print(f"\n{escrito}")
+    print(f"\nescrito en {destino.with_suffix('')}")
 
 
 if __name__ == "__main__":

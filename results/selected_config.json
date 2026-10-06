@@ -1,5 +1,8 @@
 {
   "gamma": 0.0,
+  "window": 48.0,
+  "k": 40,
+  "separation": 0.5,
   "criterio": "mean_pinball",
   "regla": "un error estándar sobre la media por origen, desempate por la celda más simple",
   "puntaje_elegida": 61.194260929385706,

@@ -96,3 +96,27 @@ def test_las_columnas_de_cuantil_salen_ordenadas(tmp_path):
     almacen.save()
     _, niveles = quantile_columns(pd.read_parquet(tmp_path / "corrida.parquet"))
     assert niveles == sorted(niveles)
+
+
+def test_las_partes_se_leen_como_un_solo_archivo(tmp_path):
+    """
+    Una corrida grande se escribe por partes y se lee entera.
+
+    Sin esto, guardar los miembros de veinticinco zonas por mil ochocientos
+    orígenes llena la memoria antes de escribir nada.
+    """
+    from experiments.forecast_store import load_forecasts
+
+    almacen = ForecastStore(NIVELES, tmp_path / "corrida.parquet")
+    for zona in ["zona_a", "zona_b"]:
+        observado, miembros, cuantiles = pronostico_sintetico()
+        almacen.add(zona, pd.Timestamp("2024-05-01 23:00"), "analogo",
+                    cuantiles, observado, miembros)
+        almacen.flush(zona)
+
+    entera = load_forecasts(tmp_path / "corrida.parquet")
+    assert set(entera.zone) == {"zona_a", "zona_b"}
+    assert len(entera) == 48
+
+    miembros = load_members(tmp_path / "corrida.parquet")
+    assert miembros is not None and set(miembros.zone) == {"zona_a", "zona_b"}

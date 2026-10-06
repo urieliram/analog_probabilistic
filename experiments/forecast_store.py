@@ -64,6 +64,33 @@ class ForecastStore:
             m.insert(0, "zone", zone)
             self._miembros.append(m)
 
+    def flush(self, part: str) -> dict:
+        """
+        Vuelca lo acumulado como una parte y libera la memoria.
+
+        Hace falta para corridas grandes: los miembros de veinticinco zonas por mil
+        ochocientos orígenes son cientos de megabytes, y acumularlos hasta el final
+        llena la memoria antes de escribir nada. Las partes se guardan en un
+        directorio y se leen como si fueran un solo archivo.
+        """
+        if not self._cuantiles:
+            return {}
+        destino = self.path.with_suffix("")
+        destino.mkdir(parents=True, exist_ok=True)
+
+        cuantiles = pd.concat(self._cuantiles, ignore_index=True)
+        cuantiles.to_parquet(destino / f"{part}.parquet", index=False)
+        escrito = {"parte": part, "filas": len(cuantiles)}
+        self._cuantiles = []
+
+        if self._miembros:
+            carpeta = Path(str(destino) + "_members")
+            carpeta.mkdir(parents=True, exist_ok=True)
+            pd.concat(self._miembros, ignore_index=True).to_parquet(
+                carpeta / f"{part}.parquet", index=False)
+            self._miembros = []
+        return escrito
+
     def save(self) -> dict:
         """Escribe el archivo de pronósticos y, si los hay, el de miembros."""
         if not self._cuantiles:
@@ -83,14 +110,24 @@ class ForecastStore:
 
 
 def load_forecasts(path: Path) -> pd.DataFrame:
-    """Lee un archivo de pronósticos."""
+    """Lee una corrida, venga en un archivo suelto o repartida en partes."""
+    path = Path(path)
+    if path.is_dir():
+        return pd.read_parquet(path)
+    carpeta = path.with_suffix("")
+    if not path.exists() and carpeta.is_dir():
+        return pd.read_parquet(carpeta)
     return pd.read_parquet(path)
 
 
 def load_members(path: Path) -> Optional[pd.DataFrame]:
     """Lee los miembros de la corrida, si el método los produjo."""
-    ruta = Path(path).with_name(Path(path).stem + "_members.parquet")
-    return pd.read_parquet(ruta) if ruta.exists() else None
+    path = Path(path)
+    suelto = path.with_name(path.stem + "_members.parquet")
+    if suelto.exists():
+        return pd.read_parquet(suelto)
+    carpeta = Path(str(path.with_suffix("")) + "_members")
+    return pd.read_parquet(carpeta) if carpeta.is_dir() else None
 
 
 def member_columns(members: pd.DataFrame) -> list:
