@@ -22,7 +22,9 @@ at the top.
 Each past continuation has to be scaled to the present before it is used, and that
 is where a decision hides. You can leave its spread alone, or you can pull the
 continuations in toward their average. Pulling them in is what least squares does,
-and it is what the earlier version of this work presented as its contribution.
+and it is what the earlier version of this work presented as its contribution. How
+hard you pull is one number, and it has a name: the **shrinkage exponent** γ. At γ = 0
+the spread is left alone; at γ = 1 you get the least-squares slope.
 
 **Pulling them in is wrong.** It closes the fan, and a closed fan promises less risk
 than there is: the real price lands above the top more often. That held over six
