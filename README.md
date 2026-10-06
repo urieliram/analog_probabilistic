@@ -11,6 +11,42 @@ trajectory; the ensemble of trajectories is the forecast, and its empirical
 quantiles are the predictive distribution. No training stage, no distributional
 assumption, no residual model.
 
+## In plain words
+
+The method looks through the history for the **episodes** when the price behaved
+like it does now, sees what happened next in each one, and uses those continuations
+as tomorrow's possible futures. Forty futures, not a single **point forecast**.
+Together they make a fan: how cheap it could come out at the bottom, how expensive
+at the top.
+
+Each past continuation has to be scaled to the present before it is used, and that
+is where a decision hides. You can leave its spread alone, or you can pull the
+continuations in toward their average. Pulling them in is what least squares does,
+and it is what the earlier version of this work presented as its contribution.
+
+**Pulling them in is wrong.** It closes the fan, and a closed fan promises less risk
+than there is: the real price lands above the top more often. That held over six
+years, 25 load zones, always in the same direction, without a single exception —
+between seven and ten extra times in every hundred.
+
+What pulling in did buy was a slightly better centre: the point forecast landed
+closer. So it looked like a trade — give up the fan, gain accuracy. **It is not.**
+That accuracy shows up only in the calm year the method was tuned on. Over the five
+following years it reverses, and it reverses harder the more volatile the year. In
+2024, the worst of them, pulling in was worse on both counts at once.
+
+There is no trade. Pulling in is simply worse.
+
+This matters most to whoever uses the forecast to hedge rather than to rank models.
+The expensive mistake is falling short of the peak, and a closed fan is exactly the
+machine for falling short of the peak.
+
+And the methodological point is the uncomfortable one: **tune on one year and call it
+settled, and you will choose wrong.** We did, and the five years we had not touched
+corrected us.
+
+Same text in Spanish: [README_es.md](README_es.md).
+
 ## The member map
 
 Writing each member as `y = a + b·x`, three slopes are of interest, and they
