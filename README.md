@@ -23,7 +23,18 @@ are three different methods from the literature:
 | `ols` | `b = ρ · σ_Y / σ_X` | least squares, the rescaling shrunk by similarity |
 
 They share the search, the horizon and the cost, so they can be compared
-without confounding selection with the map.
+without confounding selection with the map. They are also three positions of one
+family indexed by a **shrinkage exponent**,
+
+```
+b_i(γ) = ρ_i^γ · σ_Y / σ_{X_i}
+```
+
+with γ = 1 the least-squares slope and γ = 0 the pattern rescaling. The exponent
+matters because the analogs were selected for having a high ρ, and using that same ρ
+again to shrink the slope narrows an ensemble that was already too narrow: the
+variance each member transmits is multiplied by ρ^(2γ). γ is chosen on the selection
+stretch, not by the authors.
 
 ## Install
 
@@ -51,44 +62,70 @@ buyer uses.
 
 ## Data
 
-`data/nodes/` holds the hourly price history of fourteen nodes of the Mexican
-wholesale electricity market, one gzipped CSV per node, about 1.1 million
-node-hours in total. `data/nodes_index.csv` lists them with their period and
-size. Each file has the same eight columns: the locational marginal price and
-its three components — energy, losses and congestion — for the day-ahead
-(`_mda`) and the real-time (`_mtr`) markets, in Mexican pesos per megawatt-hour.
+`data/panel/` holds the hourly day-ahead price of the **25 load zones** used in the
+study, from April 2018 to today, as one gzipped CSV per zone with the price and its
+three components: energy, losses and congestion. Prices are in Mexican pesos per
+megawatt-hour and come from CENACE, the national energy control centre, which
+publishes them for the 101 load zones of the national interconnected system.
 
-| node | kind | hours | period |
-|---|---|---|---|
-| `Mexican_Oriente` | market node | 93,422 | 2016-01-27 to 2026-09-23 |
-| `05LGA-115`, `06CDU-400`, `06MES-400`, `06PAE-400` | market nodes | 90,858 each | 2016-01-29 to 2026-06-10 |
-| `iguala`, `monclova`, `san_juan_del_rio` | zonal averages | 74,276 each | 2018-04-04 to 2026-09-23 |
-| `juarez`, `leon`, `monterrey`, `piedras_negras`, `reynosa` | zonal averages | 71,756 each | 2018-04-04 to 2026-06-10 |
-| `03POM-400` | market node | 49,510 | 2020-10-17 to 2026-06-10 |
+The 101 zones are not 101 independent pieces of evidence. They belong to one
+transmission network, and a single common factor — fuel cost and national demand —
+explains 85% of their variation over the period used to pick the panel. The panel
+is therefore chosen by grouping the zones on what is left after removing that
+common factor, taking the centre of each group, and adding the extreme zones fixed
+in advance by rule. `results/zone_groups.csv` lists all 101 zones with their group
+and their representative, so nothing is hidden.
 
-The paper uses `san_juan_del_rio`, day-ahead price.
+`experiments/build_panel.py` rebuilds the full 101-zone panel from the CENACE daily
+archives; the complete panel is 107 MB and lives in an archived repository with a
+permanent identifier rather than in git.
 
-Three things are worth knowing before using the files. The day-ahead series
-have a handful of missing hours caused by publication failures, which the
-experiments fill by linear interpolation. The real-time series end earlier than
-the day-ahead ones, because the operator publishes them with a lag. And the
-collection for several nodes stopped in June 2026, so their series end there.
+Three things are worth knowing before using the files. The index is in **local civil
+time**, as the market speaks. Mexico kept daylight saving until late 2022, so the
+five last Sundays of October from 2018 to 2022 have 25 hours in the published
+report: the repeated hour is dropped, and the corresponding Sundays in April have
+23. And `data/publication_stamps.csv` records, for each daily file, the hour at
+which CENACE generated it.
 
-The source is CENACE, the national energy control centre, through its public
-information system. Demand series are deliberately absent from this
-repository.
+## Protocol
+
+The series is split into stretches that never mix backwards, fixed in
+`experiments/protocol.py`:
+
+| stretch | dates | what it is |
+|---|---|---|
+| search bank | the two years before each origin, rolling | where analogs come from |
+| selection | 2020-04-01 to 2021-03-31 | where the configuration is chosen |
+| primary test | 2021-04-01 to 2026-02-28 | never inspected |
+| already inspected | 2026-03-01 onwards | reported separately |
+
+The configuration is not written by hand anywhere: it is chosen on the selection
+stretch and frozen in `results/selected_config.json`, which the experiment reads and
+without which it refuses to run.
+
+The forecast is issued on the morning of day *d*, before the 10:00 bid deadline, and
+targets the 24 hours of day *d+1*, so lead times run from 15 to 38 hours. That is
+not an assumption: `experiments/publication_times.py` measures, from the timestamp
+each archive carries, that over eight and a half years the prices for the next day
+were never generated before 13:57 — always after the bid window had closed.
 
 ## Reproducing the experiments
 
 ```bash
-python experiments/backtest.py       # main comparison, ~40 min
-python experiments/ablation.py       # the three member maps
-python experiments/calibration.py    # recalibration on past origins
-python experiments/sensitivity.py    # parameter grid
-python experiments/dm_test.py        # significance
-python experiments/tables.py         # paper/tables/*.tex
-python experiments/figures.py        # paper/figs/*.pdf
+python experiments/build_panel.py      # rebuild the 101-zone panel from archives
+python experiments/select_zones.py     # choose the panel, freeze it
+python experiments/gamma_sweep.py      # shrinkage exponent on the selection stretch
+python experiments/select_config.py    # apply the rule, freeze the configuration
+python experiments/run_forecasts.py    # produce forecasts into the store
+python experiments/evaluate.py results/forecasts_prueba.parquet
+python experiments/tables.py           # paper/tables/*.tex
+python experiments/figures.py          # paper/figs/*.pdf
 ```
+
+Producing forecasts and scoring them are two separate steps. The run writes what it
+produced — the quantiles, and the ensemble members where a method has them — and the
+evaluation reads that file. Changing a metric then costs seconds instead of hours,
+and every table in the paper comes from the same file.
 
 `backtest.py` is what takes the time, and all but a minute of it goes to
 AutoARIMA.
