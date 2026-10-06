@@ -120,3 +120,37 @@ def test_las_partes_se_leen_como_un_solo_archivo(tmp_path):
 
     miembros = load_members(tmp_path / "corrida.parquet")
     assert miembros is not None and set(miembros.zone) == {"zona_a", "zona_b"}
+
+
+def test_limpiar_borra_la_corrida_anterior(tmp_path):
+    """
+    Una corrida interrumpida no debe mezclarse con la siguiente.
+
+    Las partes se escriben zona por zona, así que sin limpiar quedarían unas zonas
+    de la corrida nueva y el resto de la vieja en el mismo directorio, y la
+    evaluación las leería como si fueran una.
+    """
+    observado, miembros, cuantiles = pronostico_sintetico()
+    destino = tmp_path / "corrida.parquet"
+
+    vieja = ForecastStore(NIVELES, destino)
+    vieja.add("zona_vieja", pd.Timestamp("2024-05-01 23:00"), "analogo",
+              cuantiles, observado, miembros)
+    vieja.flush("zona_vieja")
+    assert (destino.with_suffix("") / "zona_vieja.parquet").exists()
+
+    nueva = ForecastStore(NIVELES, destino)
+    assert nueva.limpiar(), "no reportó haber borrado nada"
+    assert not destino.with_suffix("").exists()
+    assert not Path(str(destino.with_suffix("")) + "_members").exists()
+
+    nueva.add("zona_nueva", pd.Timestamp("2024-05-02 23:00"), "analogo",
+              cuantiles, observado, miembros)
+    nueva.flush("zona_nueva")
+    guardado = pd.read_parquet(destino.with_suffix(""))
+    assert set(guardado.zone) == {"zona_nueva"}
+
+
+def test_limpiar_no_falla_si_no_hay_nada_que_borrar(tmp_path):
+    almacen = ForecastStore(NIVELES, tmp_path / "vacia.parquet")
+    assert almacen.limpiar() == []

@@ -87,6 +87,8 @@ def main() -> None:
 
     destino = Path(args.salida or RESULTS / f"forecasts_{args.tramo}.parquet")
     almacen = ForecastStore(LEVELS, destino)
+    for borrado in almacen.limpiar():
+        print(f"  (se borró la corrida anterior en {Path(borrado).name})")
 
     ## Junto a la configuración congelada se guardan los dos extremos de la
     ## familia, que es la comparación que sostiene la tesis y sale casi gratis

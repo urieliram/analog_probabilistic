@@ -16,6 +16,7 @@ sólo algunos métodos los tienen.
 """
 
 import re
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -63,6 +64,25 @@ class ForecastStore:
             m.insert(0, "origin", origin)
             m.insert(0, "zone", zone)
             self._miembros.append(m)
+
+    def limpiar(self) -> list:
+        """
+        Borra las partes de una corrida anterior en el mismo destino.
+
+        Las partes se escriben zona por zona, así que una corrida interrumpida deja
+        un directorio con unas zonas nuevas y el resto viejas, y la evaluación lo
+        lee como si fuera una sola corrida. Ha pasado. Se limpia antes de empezar.
+        """
+        borrados = []
+        for carpeta in (self.path.with_suffix(""),
+                        Path(str(self.path.with_suffix("")) + "_members")):
+            if carpeta.is_dir():
+                borrados.append(str(carpeta))
+                shutil.rmtree(carpeta)
+        if self.path.exists():
+            borrados.append(str(self.path))
+            self.path.unlink()
+        return borrados
 
     def flush(self, part: str) -> dict:
         """

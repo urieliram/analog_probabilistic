@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from experiments.evaluate import evaluar_archivo  # noqa: E402
 from experiments.protocol import COMMON_LEVELS, RESULTS  # noqa: E402
+from experiments.scores import diebold_mariano  # noqa: E402
 
 ## La rejilla común va de 0.1 a 0.9, así que el intervalo que existe es el de 80%:
 ## pedir el de 90% exigiría los cuantiles 0.05 y 0.95, que no todos los métodos
@@ -60,14 +61,35 @@ def main() -> None:
         a, b = metodos
         por_zona = puntajes.pivot_table(index="zone", columns="method",
                                         values="mean_pinball")
-        gana = (por_zona[a] < por_zona[b]).sum()
+        gana = int((por_zona[a] < por_zona[b]).sum())
         print(f"\n{a} gana a {b} en {gana} de {len(por_zona)} zonas")
 
-    salida = RESULTS / f"{ruta.stem}_scores_common.csv"
+        ## La prueba se hace sobre diferencias pareadas: mismo origen, misma zona,
+        ## los mismos análogos. Se promedia sobre las zonas antes de probar porque
+        ## las zonas de un mismo origen comparten el día, y tratarlas como
+        ## observaciones independientes infla el estadístico.
+        for puntaje in ["mean_pinball", "crps", "mae"]:
+            if puntaje not in puntajes.columns:
+                continue
+            ancho = puntajes.pivot_table(index="origin", columns="method",
+                                         values=puntaje).dropna()
+            if ancho.empty:
+                continue
+            diferencia = (ancho[a] - ancho[b]).sort_index().to_numpy()
+            t, _ = diebold_mariano(diferencia)
+            favorece = a if diferencia.mean() < 0 else b
+            print(f"  {puntaje}: diferencia media {diferencia.mean():+.4f} "
+                  f"({a} menos {b}), t = {t:+.2f}, favorece a {favorece}")
+
+    ## el nombre lleva la rejilla: dos rejillas dan dos números distintos para el
+    ## mismo puntaje, y escribirlos en el mismo archivo es cómo se mezclan dos
+    ## corridas en un cuadro
+    rejilla = "completa" if completo else "comun"
+    salida = RESULTS / f"{ruta.stem}_puntajes_{rejilla}.csv"
     puntajes.to_csv(salida, index=False)
-    resumen = puntajes.groupby(["method", "anio"])[columnas].mean()
-    resumen.round(6).to_csv(RESULTS / f"{ruta.stem}_por_anio.csv")
-    print(f"\nescrito {salida.name} y {ruta.stem}_por_anio.csv")
+    por_anio = RESULTS / f"{ruta.stem}_por_anio_{rejilla}.csv"
+    puntajes.groupby(["method", "anio"])[columnas].mean().round(6).to_csv(por_anio)
+    print(f"\nescrito {salida.name} y {por_anio.name}")
 
 
 if __name__ == "__main__":
