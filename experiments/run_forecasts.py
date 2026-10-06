@@ -88,9 +88,18 @@ def main() -> None:
     destino = Path(args.salida or RESULTS / f"forecasts_{args.tramo}.parquet")
     almacen = ForecastStore(LEVELS, destino)
 
-    ## la variante sin contracción se guarda al lado: es la comparación que
-    ## sostiene la tesis y sale gratis, porque comparte la búsqueda de análogos
-    variantes = {"Analog": None, "Analog-sin-contraccion": 0.0}
+    ## Junto a la configuración congelada se guardan los dos extremos de la
+    ## familia, que es la comparación que sostiene la tesis y sale casi gratis
+    ## porque comparten la búsqueda de análogos. Si el gamma elegido coincide con
+    ## un extremo, esa variante se omite en vez de duplicarla.
+    variantes = {"Analog": None, "Analog-sin-contraccion": 0.0,
+                 "Analog-minimos-cuadrados": 1.0}
+    elegido = float(config["gamma"])
+    for nombre, gamma in list(variantes.items()):
+        if gamma is not None and gamma == elegido:
+            del variantes[nombre]
+            print(f"  (el gamma elegido es {elegido}: se omite {nombre}, "
+                  f"que sería el mismo método)")
 
     comienzo = time.time()
     for numero, zona in enumerate(zonas, 1):

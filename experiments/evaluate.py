@@ -31,7 +31,13 @@ from experiments.scores import evaluate  # noqa: E402
 
 
 def evaluar_archivo(path: Path, levels=None) -> pd.DataFrame:
-    """Puntajes por zona, origen y método, sobre los niveles pedidos."""
+    """
+    Puntajes por zona, origen y método, sobre los niveles pedidos.
+
+    Se ordena una vez y se trabaja con matrices. La versión ingenua filtraba los
+    miembros con un barrido completo de la tabla por cada pronóstico: con noventa
+    mil pronósticos sobre dos millones de filas, eso es cuadrático y no termina.
+    """
     pronosticos = load_forecasts(path)
     columnas, disponibles = quantile_columns(pronosticos)
     niveles = [a for a in (levels or disponibles)
@@ -40,26 +46,36 @@ def evaluar_archivo(path: Path, levels=None) -> pd.DataFrame:
         raise ValueError("ninguno de los niveles pedidos está en el archivo")
     columnas_usadas = [f"q{a:g}" for a in niveles]
 
+    llave = ["zone", "origin", "method"]
+    pronosticos = pronosticos.sort_values(llave + ["step"], kind="stable")
+    claves = pronosticos[llave].drop_duplicates().reset_index(drop=True)
+    pasos = len(pronosticos) // len(claves)
+    if len(pronosticos) != pasos * len(claves):
+        raise ValueError("hay pronósticos con distinto número de pasos")
+
+    cuantiles = (pronosticos[columnas_usadas].to_numpy()
+                 .reshape(len(claves), pasos, len(niveles)))
+    observado = pronosticos["observed"].to_numpy().reshape(len(claves), pasos)
+    segundos = pronosticos["seconds"].to_numpy().reshape(len(claves), pasos)[:, 0]
+
+    muestras = None
     miembros = load_members(path)
-    columnas_miembro = member_columns(miembros) if miembros is not None else []
+    if miembros is not None:
+        columnas_miembro = member_columns(miembros)
+        miembros = miembros.sort_values(llave + ["step"], kind="stable")
+        suyas = miembros[llave].drop_duplicates().reset_index(drop=True)
+        if suyas.equals(claves) and len(miembros) == pasos * len(claves):
+            muestras = (miembros[columnas_miembro].to_numpy()
+                        .reshape(len(claves), pasos, len(columnas_miembro)))
 
     filas = []
-    for (zona, origen, metodo), grupo in pronosticos.groupby(
-            ["zone", "origin", "method"], sort=False):
-        grupo = grupo.sort_values("step")
-        cuantiles = grupo[columnas_usadas].to_numpy().T
-        observado = grupo["observed"].to_numpy()
-
-        muestra = None
-        if miembros is not None:
-            trozo = miembros[(miembros.zone == zona) & (miembros.origin == origen)
-                             & (miembros.method == metodo)]
-            if len(trozo):
-                muestra = trozo.sort_values("step")[columnas_miembro].to_numpy().T
-
-        filas.append({"zone": zona, "origin": origen, "method": metodo,
-                      "seconds": float(grupo["seconds"].iloc[0]),
-                      **evaluate(observado, cuantiles, niveles, muestra)})
+    for fila in range(len(claves)):
+        muestra = muestras[fila].T if muestras is not None else None
+        filas.append({
+            "zone": claves.zone[fila], "origin": claves.origin[fila],
+            "method": claves.method[fila], "seconds": float(segundos[fila]),
+            **evaluate(observado[fila], cuantiles[fila].T, niveles, muestra),
+        })
     return pd.DataFrame(filas)
 
 
