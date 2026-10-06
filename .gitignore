@@ -22,3 +22,8 @@ results/*.log
 ## run_forecasts.py: al repositorio van los puntajes, que es lo que el artículo usa
 results/*.parquet
 results/forecasts_*/
+
+## el archivo por pronóstico de cada corrida pesa decenas de megabytes: al
+## repositorio van los agregados por origen y por zona-año, que resumir_corrida.py
+## produce y de donde sale cada número del artículo
+results/*_puntajes_*.csv
