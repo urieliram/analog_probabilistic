@@ -137,14 +137,34 @@ def factores_asimetricos(observado: np.ndarray, mediana: np.ndarray,
             cuantil_conformal(s_abajo, ALFA / 2))
 
 
+## El factor puede ser MENOR que uno, y eso es deliberado. La versión anterior lo
+## acotaba por abajo en 1.0, de modo que la capa sólo sabía ensanchar: un método
+## demasiado estrecho recibía su corrección completa y uno demasiado ancho no recibía
+## ninguna. Como los métodos demasiado anchos del banco son casi todos variantes del
+## análogo —y angostar un intervalo que sobra MEJORA el puntaje— ese piso estaba
+## inclinando el cuadro en contra del método propio, además de romper la regla de que
+## todos reciban el mismo trato. La capa de cuantiles nunca tuvo ese piso, así que las
+## dos familias no estaban jugando igual.
+##
+## El piso que queda es un suelo numérico, no una decisión: un factor cero o negativo
+## colapsaría el ensamble a su mediana.
+FACTOR_MINIMO = 0.05
+
+
 def escala(miembros: np.ndarray, mediana: np.ndarray,
            c_arriba: np.ndarray, c_abajo: np.ndarray = None) -> np.ndarray:
-    """Estira el ensamble alrededor de su mediana, por lado si se dan dos factores."""
+    """
+    Estira o encoge el ensamble alrededor de su mediana, por lado si se dan dos factores.
+
+    El orden de los escenarios no cambia con ninguno de los dos signos: el miembro que
+    iba más alto sigue yendo más alto, de modo que las trayectorias sobreviven.
+    """
     desvio = miembros - mediana[None, :]
     if c_abajo is None:
-        return mediana[None, :] + np.clip(c_arriba, 1.0, None)[None, :] * desvio
-    arriba = np.clip(c_arriba, 1.0, None)[None, :]
-    abajo = np.clip(c_abajo, 1.0, None)[None, :]
+        factor = np.clip(c_arriba, FACTOR_MINIMO, None)[None, :]
+        return mediana[None, :] + factor * desvio
+    arriba = np.clip(c_arriba, FACTOR_MINIMO, None)[None, :]
+    abajo = np.clip(c_abajo, FACTOR_MINIMO, None)[None, :]
     return mediana[None, :] + np.where(desvio > 0, arriba * desvio, abajo * desvio)
 
 
