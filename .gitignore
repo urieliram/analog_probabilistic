@@ -18,12 +18,21 @@ paper/*.synctex.gz
 paper/paper_analog_probabilistic.pdf
 results/*.log
 
-## los pronósticos crudos pesan cientos de megabytes y se regeneran con
-## run_forecasts.py: al repositorio van los puntajes, que es lo que el artículo usa
+## REGLA GENERAL: todo subdirectorio de results/ es salida de corrida y se regenera
+## con su script. Son gigabytes —4.9 GB sólo entre las variantes de picos y los
+## ingenuos— y enumerar los nombres uno por uno ya falló: la lista decía
+## forecasts_*/ y grid_*/ cuando llegaron picos_prueba/ y bench_prueba/, y un
+## `git add -A` se pasó diez minutos empaquetando parquets antes de que lo notara.
+## Al repositorio van los CSV de resumen, que es lo que el artículo usa.
+results/*/
 results/*.parquet
-results/forecasts_*/
 
 ## el archivo por pronóstico de cada corrida pesa decenas de megabytes: al
 ## repositorio van los agregados por origen y por zona-año, que resumir_corrida.py
 ## produce y de donde sale cada número del artículo
 results/*_puntajes_*.csv
+
+
+## los puntajes por pronóstico de la capa conformal son cientos de miles de filas y
+## más de cien megabytes: al repositorio va el agregado que escribe comparativo.py
+results/*_conformal.csv

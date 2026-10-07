@@ -38,25 +38,47 @@ def _errores_recientes(historia: np.ndarray, rezago: int, horizonte: int,
     return np.array(errores)
 
 
+def _trayectorias(centro: np.ndarray, errores: np.ndarray) -> np.ndarray:
+    """
+    El centro más cada vector de error pasado: una trayectoria por error.
+
+    Importa que sean trayectorias y no cuantiles sueltos. Un comparativo que sólo
+    entrega cuantiles por hora ya perdió la estructura de caminos, y entonces no se
+    le pueden calcular los puntajes de trayectoria ni recibe el mismo tratamiento de
+    calibración que un método con muestra. Emitiéndolas así, todo el banco se
+    compara con las mismas reglas.
+
+    El error de cada día pasado se usa completo, con su forma: si el error de ayer
+    fue chico de madrugada y grande a las siete de la tarde, esa trayectoria lleva
+    ese perfil.
+    """
+    if errores.size == 0:
+        return centro[None, :]
+    return centro[None, :] + errores
+
+
 def naive(historia: np.ndarray, horizonte: int, levels: Sequence[float],
-          rezago: int = 24, ventana: int = VENTANA_ERRORES) -> np.ndarray:
+          rezago: int = 24, ventana: int = VENTANA_ERRORES,
+          miembros: bool = False):
     """Repite lo que pasó hace ``rezago`` horas y pone intervalos con sus errores."""
     centro = historia[-rezago:][:horizonte].astype(float)
     if len(centro) < horizonte:
         centro = np.resize(centro, horizonte)
-    return _cuantiles_de_errores(
-        centro, _errores_recientes(historia, rezago, horizonte, ventana), levels)
+    errores = _errores_recientes(historia, rezago, horizonte, ventana)
+    if miembros:
+        return _trayectorias(centro, errores)
+    return _cuantiles_de_errores(centro, errores, levels)
 
 
 def naive_semanal(historia: np.ndarray, horizonte: int,
-                  levels: Sequence[float], **kwargs) -> np.ndarray:
+                  levels: Sequence[float], **kwargs):
     """El mismo día de la semana pasada."""
     return naive(historia, horizonte, levels, rezago=168, **kwargs)
 
 
 def naive_combinado(historia: np.ndarray, horizonte: int,
                     levels: Sequence[float],
-                    ventana: int = VENTANA_ERRORES) -> np.ndarray:
+                    ventana: int = VENTANA_ERRORES, miembros: bool = False):
     """
     Promedio del día anterior y del mismo día de la semana pasada.
 
@@ -75,4 +97,6 @@ def naive_combinado(historia: np.ndarray, horizonte: int,
     e_semanal = _errores_recientes(historia, 168, horizonte, ventana)
     n = min(len(e_diario), len(e_semanal))
     errores = ((e_diario[:n] + e_semanal[:n]) / 2 if n else np.empty((0, horizonte)))
+    if miembros:
+        return _trayectorias(centro, errores)
     return _cuantiles_de_errores(centro, errores, levels)

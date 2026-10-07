@@ -77,52 +77,69 @@ def _matriz_de_dias(dias: np.ndarray, indices: np.ndarray,
     return np.hstack(bloques + [semana])
 
 
-def lear_punto(historia: np.ndarray, horizonte: int = HORAS,
-               dias_calibracion: int = DIAS_CALIBRACION,
-               dia_semana_origen: int = 0) -> np.ndarray:
+class AjusteLEAR:
     """
-    Pronóstico puntual de las 24 horas del día siguiente al origen.
+    Los 24 modelos ya ajustados, más lo que hace falta para aplicarlos.
 
-    ``historia`` termina en la hora 23 del último día observado, de modo que el día a
-    predecir es el siguiente y todos sus rezagos ya están dentro.
+    Existe porque reajustar cada día cuesta 26 segundos por origen —324 horas para el
+    panel entero, trece días y medio— y eso no cabe. Separando ajustar de aplicar, el
+    ajuste se reusa entre reajustes y el costo baja en proporción al periodo.
 
-    ``dia_semana_origen`` es el día de la semana de ese último día observado, en 0 a 6.
-    Se cuenta desde el origen hacia atrás y no desde el principio de la historia a
-    propósito: la historia se recorta a un número entero de días por el final, así que
+    Se guardan también el centro y la escala de la transformación estabilizadora y la
+    estandarización de las variables. Si se recalcularan con la historia nueva, las
+    variables dejarían de estar en la escala con la que se ajustaron los coeficientes y
+    el pronóstico saldría torcido sin que nada avisara.
+    """
+
+    __slots__ = ("modelos", "centro", "escala", "media", "desviacion")
+
+    def __init__(self, modelos, centro, escala, media, desviacion):
+        self.modelos = modelos
+        self.centro = centro
+        self.escala = escala
+        self.media = media
+        self.desviacion = desviacion
+
+
+def _dias_y_calendario(historia: np.ndarray, dia_semana_origen: int) -> tuple:
+    """
+    La historia en forma de días por horas, y el día de la semana de cada uno.
+
+    El día ``completos - 1`` es el del origen y el ``completos`` es el que se predice.
+    El calendario se cuenta desde el origen hacia atrás, no desde el principio de la
+    historia: la historia se recorta a un número entero de días por el final, así que
     su primera hora cae en un día distinto según el recorte, y amarrar el calendario a
     ella es cómo se produce un error de uno que nadie ve.
     """
-    if horizonte != HORAS:
-        raise ValueError("LEAR es un modelo diario: el horizonte es de 24 horas")
     completos = len(historia) // HORAS
     if completos < max(REZAGOS_DIA) + 2:
         raise ValueError("historia demasiado corta para los rezagos de LEAR")
-
     dias = np.asarray(historia[len(historia) - completos * HORAS:],
                       dtype=float).reshape(completos, HORAS)
+    dia_semana = (dia_semana_origen
+                  - (completos - 1 - np.arange(completos + 1))) % 7
+    return dias, dia_semana, completos
+
+
+def ajusta_lear(historia: np.ndarray, dias_calibracion: int = DIAS_CALIBRACION,
+                dia_semana_origen: int = 0) -> AjusteLEAR:
+    """Ajusta los 24 modelos, uno por cada hora del día siguiente."""
+    dias, dia_semana, completos = _dias_y_calendario(historia, dia_semana_origen)
     transformados, centro, escala = _estabiliza(dias.ravel())
     dias_t = transformados.reshape(completos, HORAS)
 
-    ## el día `completos - 1` es el del origen y el `completos` el que se predice
-    dia_semana = (dia_semana_origen
-                  - (completos - 1 - np.arange(completos + 1))) % 7
-
-    ## se entrena sobre los días que tienen todos sus rezagos y ya están observados,
-    ## y se predice el día siguiente al último, que es el que no está en la historia
-    primero = max(REZAGOS_DIA)
-    entrenamiento = np.arange(primero, completos)
+    ## se entrena sobre los días que tienen todos sus rezagos y ya están observados
+    entrenamiento = np.arange(max(REZAGOS_DIA), completos)
     if dias_calibracion:
         entrenamiento = entrenamiento[-dias_calibracion:]
     X = _matriz_de_dias(dias_t, entrenamiento, dia_semana)
-    objetivo = np.array([completos])
-    X_futuro = _matriz_de_dias(dias_t, objetivo, dia_semana)
 
-    ## El criterio de información necesita más días que variables —103: cuatro
-    ## rezagos diarios a 24 horas más siete de calendario— porque si no, no hay con
-    ## qué estimar la varianza del ruido y la penalización queda indefinida. El LEAR
-    ## de referencia promedia también ventanas de 56 y 84 días, que caen debajo de
-    ## ese límite y exigen una estimación aparte de la varianza; esa variante queda
-    ## fuera de aquí y se declara, en vez de resolverse con un número inventado.
+    ## El criterio de información necesita más días que variables —103: cuatro rezagos
+    ## diarios a 24 horas más siete de calendario— porque si no, no hay con qué estimar
+    ## la varianza del ruido y la penalización queda indefinida. El LEAR de referencia
+    ## promedia también ventanas de 56 y 84 días, que caen debajo de ese límite y
+    ## exigen una estimación aparte de la varianza; esa variante queda fuera de aquí y
+    ## se declara, en vez de resolverse con un número inventado.
     if X.shape[0] <= X.shape[1]:
         raise ValueError(
             f"calibración demasiado corta para el criterio AIC: "
@@ -132,14 +149,43 @@ def lear_punto(historia: np.ndarray, horizonte: int = HORAS,
     media, desviacion = X.mean(axis=0), X.std(axis=0)
     desviacion[desviacion == 0] = 1.0
     X = (X - media) / desviacion
-    X_futuro = (X_futuro - media) / desviacion
 
-    prediccion = np.empty(HORAS)
-    for hora in range(HORAS):
-        y = dias_t[entrenamiento, hora]
-        modelo = LassoLarsIC(criterion="aic").fit(X, y)
-        prediccion[hora] = modelo.predict(X_futuro)[0]
-    return _deshace(prediccion, centro, escala)
+    modelos = [LassoLarsIC(criterion="aic").fit(X, dias_t[entrenamiento, hora])
+               for hora in range(HORAS)]
+    return AjusteLEAR(modelos, centro, escala, media, desviacion)
+
+
+def aplica_lear(ajuste: AjusteLEAR, historia: np.ndarray,
+                dia_semana_origen: int = 0) -> np.ndarray:
+    """
+    Aplica un ajuste ya hecho a la historia de hoy.
+
+    La transformación y la estandarización vienen del ajuste y no de la historia nueva:
+    es lo que mantiene las variables en la escala de los coeficientes.
+    """
+    dias, dia_semana, completos = _dias_y_calendario(historia, dia_semana_origen)
+    dias_t = np.arcsinh((dias.ravel() - ajuste.centro)
+                        / ajuste.escala).reshape(completos, HORAS)
+    X = _matriz_de_dias(dias_t, np.array([completos]), dia_semana)
+    X = (X - ajuste.media) / ajuste.desviacion
+    return _deshace(np.array([m.predict(X)[0] for m in ajuste.modelos]),
+                    ajuste.centro, ajuste.escala)
+
+
+def lear_punto(historia: np.ndarray, horizonte: int = HORAS,
+               dias_calibracion: int = DIAS_CALIBRACION,
+               dia_semana_origen: int = 0) -> np.ndarray:
+    """
+    Pronóstico puntual de las 24 horas del día siguiente al origen, ajustando ahora.
+
+    ``historia`` termina en la hora 23 del último día observado, de modo que el día a
+    predecir es el siguiente y todos sus rezagos ya están dentro. Es el camino de un
+    solo uso: para una corrida larga conviene ``LEARRodante``, que reusa el ajuste.
+    """
+    if horizonte != HORAS:
+        raise ValueError("LEAR es un modelo diario: el horizonte es de 24 horas")
+    ajuste = ajusta_lear(historia, dias_calibracion, dia_semana_origen)
+    return aplica_lear(ajuste, historia, dia_semana_origen)
 
 
 class LEARRodante:
@@ -159,11 +205,21 @@ class LEARRodante:
     """
 
     def __init__(self, dias_calibracion: int = DIAS_CALIBRACION,
-                 ventana_errores: int = VENTANA_ERRORES):
+                 ventana_errores: int = VENTANA_ERRORES,
+                 refit_dias: int = 7):
         self.dias_calibracion = dias_calibracion
         self.ventana_errores = ventana_errores
+        ## Cada cuántos días se reajustan los 24 modelos. El LEAR publicado reajusta a
+        ## diario; a diario son 26 segundos por origen y 324 horas para el panel
+        ## entero, de modo que aquí se reajusta cada semana y la desviación se declara
+        ## en el artículo. El comparativo de árboles de este mismo repositorio reajusta
+        ## cada 30 días, así que hay precedente propio.
+        self.refit_dias = refit_dias
         self._errores: list = []
         self._ultimo: Optional[np.ndarray] = None
+        self._ajuste: Optional[AjusteLEAR] = None
+        self._desde_ajuste = 0
+        self.ajustes = 0
 
     @property
     def listo(self) -> bool:
@@ -172,12 +228,32 @@ class LEARRodante:
 
     def predice(self, historia: np.ndarray, horizonte: int,
                 levels: Sequence[float], dia_semana_origen: int = 0) -> np.ndarray:
-        centro = lear_punto(historia, horizonte, self.dias_calibracion,
-                            dia_semana_origen)
+        if horizonte != HORAS:
+            raise ValueError("LEAR es un modelo diario: el horizonte es de 24 horas")
+        if self._ajuste is None or self._desde_ajuste >= self.refit_dias:
+            self._ajuste = ajusta_lear(historia, self.dias_calibracion,
+                                       dia_semana_origen)
+            self._desde_ajuste = 0
+            self.ajustes += 1
+        self._desde_ajuste += 1
+        centro = aplica_lear(self._ajuste, historia, dia_semana_origen)
         self._ultimo = centro
         errores = np.array(self._errores[-self.ventana_errores:]) if self._errores \
             else np.empty((0, horizonte))
         return _cuantiles_de_errores(centro, errores, levels)
+
+    def trayectorias(self) -> Optional[np.ndarray]:
+        """
+        El centro del último pronóstico más cada vector de error ya observado.
+
+        Se emite así para que LEAR reciba el mismo tratamiento que los métodos con
+        muestra: una trayectoria por error pasado, con su forma completa. Devuelve
+        ``None`` mientras no haya errores, que es cuando el intervalo sería un punto.
+        """
+        if self._ultimo is None or not self._errores:
+            return None
+        errores = np.array(self._errores[-self.ventana_errores:])
+        return self._ultimo[None, :] + errores
 
     def observa(self, observado: np.ndarray) -> None:
         """Guarda el error del último pronóstico, una vez que el día ya pasó."""
@@ -190,3 +266,5 @@ class LEARRodante:
         """Entre zonas: los errores de una zona no dicen nada de otra."""
         self._errores = []
         self._ultimo = None
+        self._ajuste = None
+        self._desde_ajuste = 0

@@ -95,3 +95,40 @@ def test_rechaza_una_calibracion_con_menos_dias_que_variables():
     """
     with pytest.raises(ValueError, match="103 variables"):
         lear_punto(serie_periodica(130), dias_calibracion=80)
+
+
+def test_el_rodante_con_reajuste_diario_da_lo_mismo_que_ajustar_cada_vez():
+    """
+    Separar ajustar de aplicar no debe cambiar ningún número.
+
+    Es la prueba que vuelve seguro el refactor: si reusar el ajuste diera algo distinto
+    de ajustar en el momento, el reajuste periódico habría metido un error silencioso
+    en toda la corrida de LEAR.
+    """
+    from experiments.benchmarks.lear import LEARRodante
+
+    dias = 130
+    serie = serie_periodica(dias)
+    directo = lear_punto(serie, dia_semana_origen=(dias - 1) % 7,
+                         dias_calibracion=110)
+
+    rodante = LEARRodante(dias_calibracion=110, refit_dias=1)
+    cuantiles = rodante.predice(serie, 24, [0.1, 0.5, 0.9],
+                               dia_semana_origen=(dias - 1) % 7)
+    ## sin errores acumulados todavía, los tres cuantiles son el propio centro
+    assert np.abs(cuantiles[1] - directo).max() < 1e-9
+    assert rodante.ajustes == 1
+
+
+def test_el_reajuste_periodico_no_reajusta_antes_de_tiempo():
+    """Con reajuste semanal, siete orígenes seguidos usan un solo ajuste."""
+    from experiments.benchmarks.lear import LEARRodante
+
+    serie = serie_periodica(140)
+    rodante = LEARRodante(dias_calibracion=110, refit_dias=7)
+    for dia in range(7):
+        corte = len(serie) - (6 - dia) * 24
+        rodante.predice(serie[:corte], 24, [0.1, 0.5, 0.9],
+                        dia_semana_origen=(corte // 24 - 1) % 7)
+        rodante.observa(np.full(24, 500.0))
+    assert rodante.ajustes == 1, f"reajustó {rodante.ajustes} veces, debía ser 1"
