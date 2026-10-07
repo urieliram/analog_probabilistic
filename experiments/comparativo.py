@@ -65,8 +65,15 @@ def movimiento_real(zonas: list) -> pd.DataFrame:
 
 def main() -> None:
     t = carga()
-    t["escapa_abajo"] = t["hit_0.05"]
-    t["escapa_arriba"] = 1 - t["hit_0.95"]
+    ## El intervalo de 80% es la columna común del banco, no el de 90%. TiRex y
+    ## TimesFM se detienen en el cuantil 0.9, así que su intervalo central más ancho de
+    ## fábrica es el de 80%; al 90% unos modelos llegarían por cuantil propio y otros
+    ## por extrapolación, y la misma columna mediría dos cosas distintas. El 90% y el
+    ## 95% se reportan aparte, sólo para los que los emiten nativos.
+    t["escapa_abajo"] = t["hit_0.1"]
+    t["escapa_arriba"] = 1 - t["hit_0.9"]
+    t["escapa_abajo_90"] = t["hit_0.05"]
+    t["escapa_arriba_90"] = 1 - t["hit_0.95"]
     t["calibrado"] = t.method.str.contains(r"\+")
     t["base"] = t.method.str.split("+").str[0]
     t["capa"] = np.where(t.calibrado, t.method.str.split("+").str[1], "crudo")
@@ -74,8 +81,12 @@ def main() -> None:
     print(f"{t.method.nunique()} métodos · {t.zone.nunique()} zonas · "
           f"{t.origin.nunique()} orígenes · {len(t):,d} pronósticos evaluados\n")
 
-    columnas = ["mean_pinball", "crps", "cover90", "escapa_abajo", "escapa_arriba",
-                "sharp90", "winkler90", "mae", "reliability"]
+    ## columna común: el intervalo de 80%, nativo en todos los métodos del banco
+    columnas = ["mean_pinball", "crps", "cover80", "escapa_abajo", "escapa_arriba",
+                "sharp80", "winkler80", "mae", "reliability"]
+    ## sólo para los que llegan al 0.05 y 0.95 de fábrica
+    columnas_90 = ["cover90", "escapa_abajo_90", "escapa_arriba_90", "sharp90",
+                   "winkler90"]
 
     print("=" * 78)
     print("1. EN CRUDO: lo que cada método entrega de fábrica")
@@ -110,14 +121,16 @@ def main() -> None:
     j["cuarto"] = pd.qcut(j.rango, 4, labels=["tranquilo+", "tranquilo",
                                               "movido", "movido+"])
     peor = j[j.cuarto == "movido+"].groupby("method")[
-        ["escapa_arriba", "escapa_abajo", "cover90", "sharp90"]].mean()
-    print("en el cuarto de días MÁS MOVIDOS, se prometió 0.05 de escape por lado\n")
+        ["escapa_arriba", "escapa_abajo", "cover80", "sharp80",
+         "escapa_arriba_90", "cover90"]].mean()
+    print("en el cuarto de días MÁS MOVIDOS. En el intervalo común de 80% se prometió")
+    print("0.10 de escape por lado; la columna _90 es el 0.05 del intervalo de 90%\n")
     print(peor.sort_values("escapa_arriba").round(4).to_string())
 
-    print("\n--- cobertura por cuarto de movimiento, peor desvío del 0.90 ---")
-    p2 = j.pivot_table(index="method", columns="cuarto", values="cover90",
+    print("\n--- cobertura del 80% por cuarto de movimiento, peor desvío del 0.80 ---")
+    p2 = j.pivot_table(index="method", columns="cuarto", values="cover80",
                        observed=True)
-    p2["peor_desvio"] = (p2 - 0.90).abs().max(axis=1)
+    p2["peor_desvio"] = (p2 - 0.80).abs().max(axis=1)
     print(p2.round(3).sort_values("peor_desvio").to_string())
 
     print("\n" + "=" * 78)
@@ -142,8 +155,15 @@ def main() -> None:
     else:
         print(f"  (no hay método {REFERENCIA} en las corridas cargadas)")
 
+    print("\n" + "=" * 78)
+    print("6. EL 90%, sólo para los métodos que llegan al 0.05 y 0.95 de fábrica")
+    print("=" * 78)
+    print("el análogo llega porque sus cuantiles salen del ensamble; TiRex y TimesFM")
+    print("se detienen en 0.9 y aquí no aparecerían\n")
+    print(t.groupby("method")[columnas_90].mean().round(3).to_string())
+
     salida = RESULTS / "comparativo_banco.csv"
-    t.groupby("method")[columnas].mean().round(6).to_csv(salida)
+    t.groupby("method")[columnas + columnas_90].mean().round(6).to_csv(salida)
     peor.round(6).to_csv(RESULTS / "comparativo_picos.csv")
     print(f"\nescrito {salida.name} y comparativo_picos.csv")
 
