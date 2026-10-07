@@ -23,15 +23,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from analog_probabilistic.analog_probabilistic import (  # noqa: E402
     ensemble_quantiles, find_analogs, member_map)
-from experiments.protocol import (GAMMA_GRID, HORIZON, RESULTS,  # noqa: E402
+from experiments.protocol import (GAMMA_GRID, HORIZON,  # noqa: E402
+                                  INHERITED_K, INHERITED_SEPARATION,
+                                  INHERITED_WINDOW, RESULTS,
                                   SEARCH_YEARS, SELECTION_END, SELECTION_START,
                                   build_origins, load_selected_zones)
 from experiments.scores import LEVELS, evaluate  # noqa: E402
 from experiments.series import load_series  # noqa: E402
 
-WINDOW = 48
-K = 40
-SEPARATION = 0.5
+## heredados del experimento anterior, no elegidos aquí: ver la nota en protocol.py
+WINDOW = INHERITED_WINDOW
+K = INHERITED_K
+SEPARATION = INHERITED_SEPARATION
 
 
 def miembros_por_gamma(historia, analogos, presente, gammas, limites):

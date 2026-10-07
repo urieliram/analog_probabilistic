@@ -46,6 +46,17 @@ INSPECTED_END = "2026-09-30"
 WINDOW_GRID = (24, 48, 72, 168)
 K_GRID = (10, 20, 40, 100)
 SEPARATION_GRID = (0.5, 1.0)
+
+## HEREDADOS, NO ELEGIDOS. Estos tres valores vienen del experimento anterior y el
+## barrido de este rediseño los dejó fijos: sólo recorrió gamma. Es decir que la
+## malla de arriba está declarada pero no se ha corrido, y la ventana de 48 horas no
+## tiene detrás ninguna comparación contra 24, 72 o 168 sobre estos datos. Mientras
+## eso siga así, estos valores se leen de aquí y no se escriben a mano en los
+## módulos, para que el hueco se vea en el protocolo en vez de esconderse en un
+## script de barrido.
+INHERITED_WINDOW = 48
+INHERITED_K = 40
+INHERITED_SEPARATION = 0.5
 GAMMA_GRID = (0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
 
 ## Malla de los comparativos. El recorte de salida y los pesos por similitud no se
@@ -82,8 +93,21 @@ def build_origins(start: str, end: str, series: pd.Series) -> pd.DatetimeIndex:
     Orígenes a las 23:00, uno por día, con horizonte completo observado.
 
     La hora del índice es la última observada, no la hora en que se emite el
-    pronóstico: la decisión ocurre la mañana del día siguiente, antes del cierre de
-    ofertas de las 10:00, con los precios que el operador publicó la tarde anterior.
+    pronóstico. Con fechas concretas, para que no quede ambiguo:
+
+        6 de octubre, 17:00   el operador publica los precios de TODO el 7 de octubre
+        7 de octubre, 10:00   cierra la ventana para ofertar por el 8 de octubre
+        origen                7 de octubre, 23:00 — la última hora ya publicada
+        horizonte             8 de octubre, de 00:00 a 23:00
+
+    De modo que la decisión se toma la mañana del **mismo día** del origen, antes de
+    las 10:00, y las horas del origen ya se conocen porque se publicaron la tarde
+    anterior. Una versión previa de esta nota decía «la mañana del día siguiente», que
+    está corrido un día y hace parecer que el conjunto de información es otro.
+
+    Nada de esto cambia la forma del problema: la serie está completa hasta el origen
+    y se extiende 24 horas contiguas. Lo que sí vale declarar en el artículo es que
+    entre el momento de decidir y la última hora pronosticada pasan 38 horas, no 24.
     """
     days = pd.date_range(start, end, freq=f"{ORIGIN_STEP_DAYS}D")
     origins = pd.DatetimeIndex([day.replace(hour=23) for day in days])
