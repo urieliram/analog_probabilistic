@@ -28,7 +28,10 @@ from experiments.scores import diebold_mariano  # noqa: E402
 from experiments.series import load_series  # noqa: E402
 
 FUENTES = ("picos_prueba_conformal.csv", "bench_prueba_conformal.csv",
-           "lear_prueba_conformal.csv", "forecasts_prueba_conformal.csv")
+           "lear_prueba_conformal.csv", "forecasts_prueba_conformal.csv",
+           "fundacion_t0-beta_conformal.csv", "fundacion_PatchTST-FM_conformal.csv",
+           "fundacion_TimesFM-2.5_conformal.csv", "fundacion_TiRex_conformal.csv",
+           "fundacion_Moirai_conformal.csv")
 REFERENCIA = "Analog"
 
 
