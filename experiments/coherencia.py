@@ -25,7 +25,8 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from experiments.forecast_store import load_members, member_columns  # noqa: E402
+from experiments.forecast_store import (load_members,  # noqa: E402
+                                        member_columns, member_matrix)
 from experiments.protocol import RESULTS  # noqa: E402
 
 
@@ -70,8 +71,7 @@ def de_una_corrida(ruta: Path, origenes: int = 200) -> pd.DataFrame:
     filas = []
     for (zona, metodo), bloque in miembros.groupby(["zone", "method"], sort=False):
         for origen, pron in list(bloque.groupby("origin", sort=False))[:origenes]:
-            m = pron.sort_values("step")[columnas].to_numpy().T
-            m = m[~np.isnan(m).any(axis=1)]
+            m = member_matrix(pron.sort_values("step"), columnas)
             if len(m) < 2:
                 continue
             fila = {"metodo": metodo, "zona": zona, "miembros": len(m)}

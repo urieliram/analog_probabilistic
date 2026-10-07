@@ -51,7 +51,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from experiments.forecast_store import (member_columns,  # noqa: E402
-                                        quantile_columns)
+                                        member_matrix, quantile_columns)
 from experiments.protocol import RESULTS  # noqa: E402
 from experiments.scores import LEVELS, evaluate  # noqa: E402
 
@@ -141,7 +141,11 @@ def una_zona(pronosticos: pd.DataFrame, miembros: pd.DataFrame, metodo: str,
         p, m = bloques_p[origen], bloques_m[origen]
         if len(p) != pasos or len(m) != pasos:
             continue
-        ensamble = m[columnas_m].to_numpy().T          ## miembros x pasos
+        ## sin los miembros ausentes: un archivo con métodos de distinto número de
+        ## miembros deja columnas en NaN, y leerlas envenena todos los cuantiles
+        ensamble = member_matrix(m, columnas_m)
+        if len(ensamble) < 2:
+            continue
         observado = p["observed"].to_numpy()
         mediana = p[fila_mediana].to_numpy()
         dispersion = ensamble.std(axis=0)

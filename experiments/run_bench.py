@@ -64,11 +64,10 @@ def una_zona(tarea: tuple) -> dict:
 
     serie = load_series("pml", zona)
     almacen = ForecastStore(LEVELS, salida)
-    lear = LEARRodante() if "LEAR" in metodos else None
+    lear = LEARRodante(refit_dias=refit) if "LEAR" in metodos else None
     ## LEAR se reajusta cada `refit` días y entre reajustes reusa sus coeficientes:
     ## a diario son 26 segundos por origen, trescientas veinticuatro horas para el
     ## panel entero, y eso no cabe. La desviación se declara en el artículo.
-    ultimo_ajuste, coeficientes = None, None
 
     for numero, origen in enumerate(build_origins(inicio, fin, serie)):
         historia = serie.loc[:origen].values[-SEARCH_YEARS * 8760:]

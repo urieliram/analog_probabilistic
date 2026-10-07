@@ -154,3 +154,34 @@ def test_limpiar_borra_la_corrida_anterior(tmp_path):
 def test_limpiar_no_falla_si_no_hay_nada_que_borrar(tmp_path):
     almacen = ForecastStore(NIVELES, tmp_path / "vacia.parquet")
     assert almacen.limpiar() == []
+
+
+def test_los_miembros_ausentes_no_entran_en_la_matriz(tmp_path):
+    """
+    Dos métodos con distinto número de miembros no deben envenenarse entre sí.
+
+    El análogo lleva 40 miembros y su variante de mezcla 160. Guardados en el mismo
+    archivo, la tabla queda con 160 columnas y ausentes en las del método corto. Leerlas
+    todas devolvía filas de NaN y los cuantiles salían en NaN: con eso, cuatro de cinco
+    variantes aparecieron con cobertura cero en el primer cuadro comparativo.
+    """
+    from experiments.forecast_store import member_matrix
+
+    observado, miembros, cuantiles = pronostico_sintetico()
+    pocos, muchos = miembros[:4], np.vstack([miembros, miembros])   ## 4 y 24
+
+    almacen = ForecastStore(NIVELES, tmp_path / "mezcla.parquet")
+    for nombre, m in [("corto", pocos), ("largo", muchos)]:
+        almacen.add("zona_a", pd.Timestamp("2024-05-01 23:00"), nombre,
+                    np.quantile(m, NIVELES, axis=0), observado, m)
+    almacen.flush("zona_a")
+
+    guardado = load_members(tmp_path / "mezcla.parquet")
+    columnas = member_columns(guardado)
+    assert len(columnas) == 24, "la tabla debe tener tantas columnas como el mayor"
+
+    for nombre, esperados in [("corto", 4), ("largo", 24)]:
+        bloque = guardado[guardado.method == nombre].sort_values("step")
+        matriz = member_matrix(bloque, columnas)
+        assert matriz.shape == (esperados, 24), f"{nombre}: {matriz.shape}"
+        assert not np.isnan(matriz).any(), f"{nombre} trae ausentes"

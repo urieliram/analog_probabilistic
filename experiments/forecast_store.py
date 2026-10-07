@@ -161,6 +161,26 @@ def member_columns(members: pd.DataFrame) -> list:
     return [c for c in members.columns if re.fullmatch(r"m\d+", c)]
 
 
+def member_matrix(block: pd.DataFrame, columns: Optional[list] = None) -> np.ndarray:
+    """
+    Los miembros de un pronóstico como matriz (miembros, pasos), sin los ausentes.
+
+    Un archivo puede traer métodos con distinto número de miembros: el análogo lleva 40 y
+    su variante de mezcla 160, porque junta cuatro ventanas. La tabla entonces tiene
+    tantas columnas de miembro como el mayor, y ausentes en el resto. Leerlas todas
+    devuelve filas de NaN que envenenan cualquier cuantil que se calcule después.
+
+    No es hipotético: por no hacer esto, cuatro de las cinco variantes salieron en NaN en
+    el primer cuadro comparativo, con cobertura cero y escape de uno. El archivo estaba
+    bien; quien lo leía, no.
+
+    ``block`` trae un pronóstico, una fila por paso del horizonte, ya ordenado por paso.
+    """
+    columnas = columns if columns is not None else member_columns(block)
+    matriz = block[columnas].to_numpy(dtype=float).T
+    return matriz[~np.isnan(matriz).any(axis=1)]
+
+
 def quantile_columns(forecasts: pd.DataFrame) -> tuple:
     """Devuelve las columnas de cuantil y los niveles que representan."""
     columnas = [c for c in forecasts.columns if c.startswith("q")]

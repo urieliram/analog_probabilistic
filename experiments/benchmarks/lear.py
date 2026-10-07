@@ -206,14 +206,18 @@ class LEARRodante:
 
     def __init__(self, dias_calibracion: int = DIAS_CALIBRACION,
                  ventana_errores: int = VENTANA_ERRORES,
-                 refit_dias: int = 7):
+                 refit_dias: int = 1):
         self.dias_calibracion = dias_calibracion
         self.ventana_errores = ventana_errores
-        ## Cada cuántos días se reajustan los 24 modelos. El LEAR publicado reajusta a
-        ## diario; a diario son 26 segundos por origen y 324 horas para el panel
-        ## entero, de modo que aquí se reajusta cada semana y la desviación se declara
-        ## en el artículo. El comparativo de árboles de este mismo repositorio reajusta
-        ## cada 30 días, así que hay precedente propio.
+        ## Cada cuántos días se reajustan los 24 modelos. Por omisión, CADA DÍA, que
+        ## es lo que hace el LEAR publicado: no hay desviación que declarar.
+        ##
+        ## Estuvo a punto de haberla. Un ajuste parecía costar 18.5 segundos, lo que daba
+        ## 324 horas para el panel entero y forzaba a reajustar cada semana. Pero esos
+        ## 18.5 segundos eran un artefacto de los hilos de álgebra: con los hilos libres,
+        ## la coordinación domina por completo en una matriz de 723 por 103. Con UN hilo
+        ## el mismo ajuste cuesta 0.29 segundos, sesenta y cuatro veces menos, y el panel
+        ## entero sale en media hora. Por eso este módulo se corre con OMP_NUM_THREADS=1.
         self.refit_dias = refit_dias
         self._errores: list = []
         self._ultimo: Optional[np.ndarray] = None
