@@ -85,8 +85,12 @@ def main() -> None:
           f"{t.origin.nunique()} orígenes · {len(t):,d} pronósticos evaluados\n")
 
     ## columna común: el intervalo de 80%, nativo en todos los métodos del banco
-    columnas = ["mean_pinball", "crps", "cover80", "escapa_abajo", "escapa_arriba",
-                "sharp80", "winkler80", "mae", "reliability"]
+    ## pinball_comun es la columna que compara: se calcula sobre los nueve niveles que
+    ## TODOS emiten. mean_pinball se calcula sobre la rejilla propia de cada método y no
+    ## es comparable entre métodos de rejillas distintas — nueve niveles contra
+    ## diecinueve dan promedios de tamaños distintos.
+    columnas = ["pinball_comun", "mean_pinball", "crps", "cover80", "escapa_abajo",
+                "escapa_arriba", "sharp80", "winkler80", "mae", "reliability"]
     ## sólo para los que llegan al 0.05 y 0.95 de fábrica
     columnas_90 = ["cover90", "escapa_abajo_90", "escapa_arriba_90", "sharp90",
                    "winkler90"]
@@ -95,7 +99,7 @@ def main() -> None:
     print("1. EN CRUDO: lo que cada método entrega de fábrica")
     print("=" * 78)
     crudo = t[~t.calibrado].groupby("method")[columnas].mean()
-    print(crudo.sort_values("mean_pinball").round(3).to_string())
+    print(crudo.sort_values("pinball_comun").round(3).to_string())
 
     print("\n" + "=" * 78)
     print("2. CALIBRADO: todos por la misma capa conformal")
@@ -103,7 +107,7 @@ def main() -> None:
     for capa in sorted(t[t.calibrado].capa.unique()):
         print(f"\n--- capa: {capa} ---")
         sub = t[t.capa == capa].groupby("base")[columnas].mean()
-        print(sub.sort_values("mean_pinball").round(3).to_string())
+        print(sub.sort_values("pinball_comun").round(3).to_string())
 
     print("\n" + "=" * 78)
     print("3. LA PREGUNTA DE COBERTURA: cuánto cuesta dejar de mentir")
@@ -141,10 +145,10 @@ def main() -> None:
     print("=" * 78)
     print("un estadístico negativo favorece al método de la fila\n")
     if REFERENCIA in set(t.method):
-        base = t[t.method == REFERENCIA].groupby("origin")["mean_pinball"].mean()
+        base = t[t.method == REFERENCIA].groupby("origin")["pinball_comun"].mean()
         filas = []
         for metodo in sorted(set(t.method) - {REFERENCIA}):
-            otro = t[t.method == metodo].groupby("origin")["mean_pinball"].mean()
+            otro = t[t.method == metodo].groupby("origin")["pinball_comun"].mean()
             comun = base.index.intersection(otro.index)
             if len(comun) < 30:
                 continue

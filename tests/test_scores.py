@@ -159,3 +159,26 @@ def test_la_copula_produce_caminos_correlacionados():
                                     n_paths=4000, seed=2)
     observada = np.corrcoef(caminos.T)[0, 1]
     assert observada > 0.6
+
+
+def test_el_crps_rapido_da_el_mismo_numero_que_comparar_todos_los_pares():
+    """
+    La forma ordenada del CRPS es exacta, no una aproximación.
+
+    Calcular la dispersión comparando todos los pares cuesta m al cuadrado: con mil
+    miembros la evaluación se vuelve impracticable y de hecho murió. La forma ordenada
+    da el MISMO número en m log m, y esta prueba es lo que lo sostiene.
+    """
+    rng = np.random.default_rng(11)
+    for m in (2, 3, 7, 40, 200):
+        observado = rng.normal(500, 60, 12)
+        miembros = observado[None, :] + rng.normal(0, 45, (m, 12))
+
+        ## la forma por pares, escrita aquí a propósito para no depender del módulo
+        termino = np.abs(miembros - observado[None, :]).mean(axis=0)
+        pares = np.abs(miembros[:, None, :] - miembros[None, :, :]).sum(axis=(0, 1))
+        for justo, den in [(True, 2 * m * (m - 1)), (False, 2 * m * m)]:
+            esperado = float(np.mean(termino - pares / den))
+            obtenido = crps_ensemble(observado, miembros, fair=justo)
+            assert abs(obtenido - esperado) < 1e-9 * max(1.0, abs(esperado)), \
+                f"m={m} justo={justo}: {obtenido} contra {esperado}"

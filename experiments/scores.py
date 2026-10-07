@@ -60,7 +60,20 @@ def crps_ensemble(observed: np.ndarray, members: np.ndarray,
         return float(np.mean(np.abs(members[0] - observed)))
 
     termino_error = np.abs(members - observed[None, :]).mean(axis=0)
-    dispersion = np.abs(members[:, None, :] - members[None, :, :]).sum(axis=(0, 1))
+
+    ## La dispersión es la suma de |xi - xj| sobre todos los pares, y calcularla por
+    ## pares cuesta m al cuadrado: con mil miembros son un millón de comparaciones por
+    ## paso del horizonte, y la evaluación de Moirai murió por eso. Ordenando, la misma
+    ## suma exacta sale en una pasada:
+    ##
+    ##     suma de |xi - xj| = 2 * suma_i (2i - m - 1) * x_(i)
+    ##
+    ## con i de 1 a m sobre los valores ya ordenados. No es una aproximación ni un
+    ## muestreo: da el mismo número, y el costo pasa de m al cuadrado a m log m.
+    ordenados = np.sort(members, axis=0)
+    pesos = (2 * np.arange(1, m + 1) - m - 1).astype(float)[:, None]
+    dispersion = 2.0 * (ordenados * pesos).sum(axis=0)
+
     denominador = 2 * m * (m - 1) if fair else 2 * m * m
     return float(np.mean(termino_error - dispersion / denominador))
 

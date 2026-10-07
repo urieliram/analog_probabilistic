@@ -52,8 +52,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from experiments.forecast_store import (member_columns,  # noqa: E402
                                         member_matrix, quantile_columns)
-from experiments.protocol import RESULTS  # noqa: E402
-from experiments.scores import LEVELS, evaluate  # noqa: E402
+from experiments.protocol import COMMON_LEVELS, RESULTS  # noqa: E402
+from experiments.scores import (LEVELS, evaluate,  # noqa: E402
+                                mean_pinball)
 
 VENTANA_RODANTE = 100
 BLOQUE_SPLIT = 100
@@ -61,6 +62,29 @@ ALFA = 0.10
 MINIMO = 1e-6
 TOPE_FACTOR = 10.0
 VARIANTES = ("split", "enbpi", "normalizado", "asimetrico")
+
+
+def pinball_comun(observado: np.ndarray, cuantiles: np.ndarray,
+                  niveles: list) -> float:
+    """
+    La pérdida pinball sobre la rejilla que TODOS los métodos emiten, de 0.1 a 0.9.
+
+    Hace falta porque promediar sobre rejillas distintas no compara nada: TiRex y
+    TimesFM emiten nueve niveles y el análogo diecinueve, y el promedio de nueve
+    pérdidas no es del mismo tamaño que el de diecinueve. Esta columna es la que lleva
+    la comparación entre métodos; la que se calcula sobre la rejilla propia de cada uno
+    sirve para su propio registro, no para el cuadro.
+    """
+    posicion = {round(float(a), 4): i for i, a in enumerate(niveles)}
+    indices, usados = [], []
+    for a in COMMON_LEVELS:
+        clave = round(float(a), 4)
+        if clave in posicion and np.all(np.isfinite(cuantiles[posicion[clave]])):
+            indices.append(posicion[clave])
+            usados.append(a)
+    if len(usados) != len(COMMON_LEVELS):
+        return float("nan")
+    return mean_pinball(observado, cuantiles[indices], usados)
 
 
 def cuantil_conformal(puntajes: np.ndarray, alfa: float) -> np.ndarray:
@@ -122,6 +146,74 @@ def escala(miembros: np.ndarray, mediana: np.ndarray,
     arriba = np.clip(c_arriba, 1.0, None)[None, :]
     abajo = np.clip(c_abajo, 1.0, None)[None, :]
     return mediana[None, :] + np.where(desvio > 0, arriba * desvio, abajo * desvio)
+
+
+def una_zona_cuantiles(pronosticos: pd.DataFrame, metodo: str, niveles: list,
+                       pasos: int) -> list:
+    """
+    Calibra un método que sólo entrega bordes, con regresión cuantílica conformalizada.
+
+    Es la ruta de los cuatro modelos de fundación que no dan escenarios. La idea es la
+    misma que para los que sí los dan —medir lo que falló en los días ya observados y
+    corregir por ese tanto— y las cuatro variantes son las mismas, para que las dos
+    familias se comparen con idénticas reglas.
+    """
+    columnas = {round(float(a), 4): f"q{a:g}" for a in niveles}
+    historial = {"obs": [], "q": {round(float(a), 4): [] for a in niveles}}
+    salida = []
+
+    for numero, (origen, p) in enumerate(
+            sorted(pronosticos.groupby("origin"), key=lambda kv: kv[0])):
+        p = p.sort_values("step")
+        if len(p) != pasos:
+            continue
+        observado = p["observed"].to_numpy()
+        hoy = np.array([p[columnas[round(float(a), 4)]].to_numpy() for a in niveles])
+
+        ## se califica sobre los niveles que este método emite de verdad: pasarle los
+        ## ausentes a la evaluación devuelve NaN en el puntaje principal y en la
+        ## confiabilidad, y entonces el método desaparece del cuadro sin decir por qué
+        vivos = [a for i, a in enumerate(niveles) if np.all(np.isfinite(hoy[i]))]
+        indices = [niveles.index(a) for a in vivos]
+        if len(vivos) < 3:
+            continue
+
+        if historial["obs"]:
+            for variante in VARIANTES:
+                ajustado = calibra_cuantiles(historial, hoy, niveles, variante,
+                                            VENTANA_RODANTE, BLOQUE_SPLIT)
+                if not np.all(np.isfinite(ajustado[indices])):
+                    continue
+                puntajes = evaluate(observado, ajustado[indices], vivos)
+                puntajes["pinball_comun"] = pinball_comun(observado, ajustado,
+                                                          niveles)
+                puntajes.update({"zone": p.zone.iloc[0], "origin": origen,
+                                 "method": f"{metodo}+{variante}",
+                                 "factor_medio": float(np.nanmean(
+                                     np.abs(ajustado - hoy))),
+                                 "pasos_acotados": 0,
+                                 "niveles_propios": len(vivos)})
+                salida.append(puntajes)
+
+        if numero > 0:
+            puntajes = evaluate(observado, hoy[indices], vivos)
+            puntajes["pinball_comun"] = pinball_comun(observado, hoy, niveles)
+            puntajes.update({"zone": p.zone.iloc[0], "origin": origen,
+                             "method": metodo, "factor_medio": 0.0,
+                             "pasos_acotados": 0, "niveles_propios": len(vivos)})
+            salida.append(puntajes)
+
+        historial["obs"].append(observado)
+        for a in niveles:
+            historial["q"][round(float(a), 4)].append(hoy[niveles.index(a)])
+        ## sólo se conserva lo que las variantes pueden mirar
+        tope = max(VENTANA_RODANTE, BLOQUE_SPLIT)
+        if len(historial["obs"]) > tope:
+            historial["obs"] = historial["obs"][-tope:]
+            for a in niveles:
+                clave = round(float(a), 4)
+                historial["q"][clave] = historial["q"][clave][-tope:]
+    return salida
 
 
 def una_zona(pronosticos: pd.DataFrame, miembros: pd.DataFrame, metodo: str,
@@ -198,8 +290,10 @@ def una_zona(pronosticos: pd.DataFrame, miembros: pd.DataFrame, metodo: str,
                 else:
                     nuevo = escala(ensamble, mediana, c_arr)
                 nuevo = np.sort(nuevo, axis=0)
-                puntajes = evaluate(observado, np.quantile(nuevo, niveles, axis=0),
-                                    niveles, nuevo)
+                cuantiles_nuevos = np.quantile(nuevo, niveles, axis=0)
+                puntajes = evaluate(observado, cuantiles_nuevos, niveles, nuevo)
+                puntajes["pinball_comun"] = pinball_comun(observado,
+                                                          cuantiles_nuevos, niveles)
                 puntajes.update({"zone": p.zone.iloc[0], "origin": origen,
                                  "method": f"{metodo}+{nombre}",
                                  "factor_medio": float(np.mean(c_arr)),
@@ -208,9 +302,10 @@ def una_zona(pronosticos: pd.DataFrame, miembros: pd.DataFrame, metodo: str,
 
         ## el crudo, para comparar sobre exactamente los mismos orígenes
         if numero > 0:
-            puntajes = evaluate(observado,
-                                np.quantile(ensamble, niveles, axis=0),
-                                niveles, ensamble)
+            cuantiles_crudos = np.quantile(ensamble, niveles, axis=0)
+            puntajes = evaluate(observado, cuantiles_crudos, niveles, ensamble)
+            puntajes["pinball_comun"] = pinball_comun(observado, cuantiles_crudos,
+                                                      niveles)
             puntajes.update({"zone": p.zone.iloc[0], "origin": origen,
                              "method": metodo, "factor_medio": 1.0})
             salida.append(puntajes)
@@ -248,18 +343,25 @@ def main() -> None:
         completo = pd.read_parquet(parte)
         ## los miembros de la corrida viven en un directorio hermano, una parte por
         ## zona con el mismo nombre
+        ## los miembros viven en un directorio hermano; un método que sólo entrega
+        ## bordes no lo tiene, y entonces va por la ruta de cuantiles
         carpeta_m = Path(str(ruta).rstrip("/") + "_members")
-        completo_m = pd.read_parquet(carpeta_m / parte.name)
+        archivo_m = carpeta_m / parte.name
+        completo_m = pd.read_parquet(archivo_m) if archivo_m.exists() else None
         columnas_q, niveles = quantile_columns(completo)
 
         filas_zona = 0
         for metodo in metodos:
             p = completo[completo.method == metodo]
-            m = completo_m[completo_m.method == metodo]
-            if p.empty or m.empty:
+            if p.empty:
                 continue
-            filas = una_zona(p, m, metodo, member_columns(m), niveles,
-                             int(p.step.max()))
+            m = (completo_m[completo_m.method == metodo]
+                 if completo_m is not None else None)
+            if m is None or m.empty:
+                filas = una_zona_cuantiles(p, metodo, niveles, int(p.step.max()))
+            else:
+                filas = una_zona(p, m, metodo, member_columns(m), niveles,
+                                 int(p.step.max()))
             todo.extend(filas)
             filas_zona += len(filas)
         print(f"  {numero}/{len(partes)} {parte.stem:20s} {filas_zona:,d} filas",
@@ -269,6 +371,112 @@ def main() -> None:
     destino = RESULTS / f"{ruta.name.replace('.parquet','')}_conformal.csv"
     tabla.to_csv(destino, index=False)
     print(f"\nescrito {destino.name}: {len(tabla):,d} filas")
+
+
+
+## ---------------------------------------------------------------------------
+## Calibración de los métodos que sólo entregan cuantiles
+## ---------------------------------------------------------------------------
+##
+## Cuatro de los cinco modelos de fundación —y cualquier modelo de regresión
+## cuantílica— no entregan escenarios: entregan bordes. No hay miembros que escalar, así
+## que la capa de arriba no se les puede aplicar, y aplicarles otra distinta sería
+## comparar métodos con tratamientos distintos, que es justo lo que se quiere evitar.
+##
+## Lo que sí se les aplica es la MISMA idea con la herramienta que corresponde a su forma
+## de salida: regresión cuantílica conformalizada (Romano, Patterson y Candès, 2019). Para
+## cada par simétrico de bordes se mide, en los días ya observados, cuánto se salió el
+## precio del intervalo que esos dos bordes definían; se toma el cuantil conformal de esas
+## violaciones; y se ensancha el par por ese tanto. Un valor negativo encoge el intervalo,
+## que es lo correcto cuando el método venía siendo demasiado ancho.
+##
+## Las cuatro variantes son las mismas que arriba, para que las dos familias se comparen
+## con las mismas reglas: constante, rodante, normalizada por el ancho del día, y
+## asimétrica con un ajuste por lado.
+
+def _pares_simetricos(niveles) -> list:
+    """Los pares (bajo, alto) que definen un intervalo central, de más ancho a más angosto."""
+    bajos = sorted(a for a in niveles if a < 0.5 - 1e-9)
+    pares = []
+    for bajo in bajos:
+        alto = round(1.0 - bajo, 4)
+        if any(abs(alto - a) < 1e-9 for a in niveles):
+            pares.append((bajo, alto))
+    return pares
+
+
+def violaciones(observado: np.ndarray, bajo: np.ndarray,
+                alto: np.ndarray) -> tuple:
+    """
+    Cuánto se salió el precio del intervalo, por lado y en conjunto.
+
+    El valor conjunto es negativo cuando el precio quedó cómodamente dentro, y entonces
+    el cuantil conformal encoge el intervalo en vez de ensancharlo. Eso es deseable: un
+    intervalo demasiado ancho también está mal calibrado.
+    """
+    por_abajo = bajo - observado
+    por_arriba = observado - alto
+    return np.maximum(por_abajo, por_arriba), por_abajo, por_arriba
+
+
+def calibra_cuantiles(historial: dict, cuantiles_hoy: np.ndarray, niveles: list,
+                      variante: str, ventana: int, bloque: int) -> np.ndarray:
+    """
+    Ajusta cada par de bordes con las violaciones de los días ya observados.
+
+    ``historial`` trae, por nivel, las listas de bordes y observaciones pasadas. Nada
+    posterior al origen entra aquí.
+    """
+    posicion = {round(float(a), 4): i for i, a in enumerate(niveles)}
+    salida = np.array(cuantiles_hoy, dtype=float, copy=True)
+    obs = np.array(historial["obs"])
+    if len(obs) == 0:
+        return salida
+
+    for bajo, alto in _pares_simetricos(niveles):
+        i, j = posicion[bajo], posicion[alto]
+        if np.isnan(cuantiles_hoy[i]).any() or np.isnan(cuantiles_hoy[j]).any():
+            continue
+        q_bajo = np.array(historial["q"][bajo])
+        q_alto = np.array(historial["q"][alto])
+        if np.isnan(q_bajo).any() or np.isnan(q_alto).any():
+            continue
+
+        alfa = round(2 * bajo, 4)            ## el par define una cobertura de 1 - alfa
+        recorte = slice(None, bloque) if variante == "split" else slice(-ventana, None)
+        o, b, a = obs[recorte], q_bajo[recorte], q_alto[recorte]
+        conjunta, por_abajo, por_arriba = violaciones(o, b, a)
+
+        if variante == "asimetrico":
+            q_lo = cuantil_conformal(por_abajo, alfa / 2)
+            q_hi = cuantil_conformal(por_arriba, alfa / 2)
+        elif variante == "normalizado":
+            ancho = np.maximum(a - b, MINIMO)
+            escala_hoy = max(float(np.mean(cuantiles_hoy[j] - cuantiles_hoy[i])), MINIMO)
+            q_lo = q_hi = cuantil_conformal(conjunta / ancho, alfa) * escala_hoy
+        else:                                 ## constante y rodante
+            q_lo = q_hi = cuantil_conformal(conjunta, alfa)
+
+        if not (np.all(np.isfinite(q_lo)) and np.all(np.isfinite(q_hi))):
+            continue
+        salida[i] = cuantiles_hoy[i] - q_lo
+        salida[j] = cuantiles_hoy[j] + q_hi
+
+    ## Ensanchar cada par por su cuenta puede cruzar los bordes: un par interior podría
+    ## recibir más ajuste que el que lo contiene. Se fuerza el orden, que es una
+    ## propiedad de cualquier función de cuantiles y no una corrección cosmética.
+    ##
+    ## El orden se fuerza SÓLO entre los niveles que el método emite. Acumular sobre
+    ## todos borraba las cuatro variantes en silencio: el nivel más bajo de la rejilla
+    ## es ausente en los modelos que se detienen en 0.9, y maximum.accumulate propaga
+    ## el ausente a toda la columna, de modo que el resultado salía entero en NaN y se
+    ## descartaba sin aviso.
+    presentes = [i for i, a in enumerate(niveles)
+                 if np.all(np.isfinite(salida[i]))]
+    if len(presentes) > 1:
+        orden = sorted(presentes, key=lambda i: float(niveles[i]))
+        salida[orden] = np.maximum.accumulate(salida[orden], axis=0)
+    return salida
 
 
 if __name__ == "__main__":
