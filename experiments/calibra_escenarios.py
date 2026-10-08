@@ -56,6 +56,9 @@ H2. ``raiz`` o ``nivel`` mejoran la CRPS ponderada de la cuenta del día respect
     ``proporcional`` (pesos uniforme y cola alta), método por método.
 H3. Después de un día conocido caro, la cobertura de la cuenta de los escenarios de
     errores se acerca a 0.90 con ``nivel``.
+H7. (declarada el 2026-10-08, antes de correr ``potencia``) la potencia ajustada
+    ``Q * max(m, 100) ** beta``, con beta estimado de los cien días previos, le gana a la
+    raíz fija y queda entre ella y ``nivel_bloque``.
 H4. (declarada después de H1-H3, antes de correr ``nivel_bloque``) ``nivel_bloque``
     reduce la diferencia de cobertura horaria entre la madrugada y la tarde respecto de
     ``nivel``, y mejora la CRPS ponderada de la cuenta del día respecto de ``nivel``.
@@ -83,7 +86,7 @@ from experiments.protocol import RESULTS  # noqa: E402
 from experiments.scores import pinball  # noqa: E402
 
 NIVELES = np.round(np.arange(0.05, 0.96, 0.05), 2)
-VARIANTES = ("crudo", "proporcional", "raiz", "nivel", "nivel_bloque")
+VARIANTES = ("crudo", "proporcional", "raiz", "nivel", "nivel_bloque", "potencia")
 BLOQUES = (range(0, 6), range(6, 12), range(12, 18), range(18, 24))
 TRAMOS_BLOQUE = 5
 PISO = 100.0
@@ -126,6 +129,28 @@ def _por_tramos(med_pasado, exceso_pasado, med_hoy, tramos):
     return w_arr, w_aba
 
 
+def _escala_potencia(med_pasado, exceso_pasado, med_hoy, tramos=TRAMOS):
+    """
+    La raíz del vendedor de periódicos con el exponente estimado de los datos: m^beta.
+
+    beta es la pendiente, en escala logarítmica, del percentil 90 del error absoluto
+    contra el nivel pronosticado, por tramos de nivel de los cien días previos; se acota
+    entre 0 y 2. Devuelve la escala de cada punto pasado y de cada hora de hoy.
+    """
+    nivel = np.maximum(med_pasado, PISO)
+    cortes = np.quantile(nivel, np.linspace(0, 1, tramos + 1)[1:-1])
+    tramo = np.searchsorted(cortes, nivel)
+    x, y = [], []
+    for t in np.unique(tramo):
+        dentro = tramo == t
+        e90 = np.quantile(np.abs(exceso_pasado[dentro]), 0.9)
+        if e90 > 0:
+            x.append(np.log(np.median(nivel[dentro])))
+            y.append(np.log(e90))
+    beta = float(np.clip(np.polyfit(x, y, 1)[0], 0.0, 2.0)) if len(x) >= 3 else 0.5
+    return nivel ** beta, np.maximum(med_hoy, PISO) ** beta
+
+
 def factores(variante, H, med, arr, aba, disp):
     """Factor por hora y por lado que lleva el ensamble de hoy a la anchura objetivo."""
     exceso = H["obs"] - H["med"]
@@ -139,6 +164,10 @@ def factores(variante, H, med, arr, aba, disp):
         q_arr, q_aba = _por_lado(exceso, np.sqrt(np.maximum(H["med"], PISO)), ALFA)
         g = np.sqrt(np.maximum(med, PISO))
         w_arr, w_aba = q_arr * g, q_aba * g
+    elif variante == "potencia":
+        g_pas, g_hoy = _escala_potencia(H["med"].ravel(), exceso.ravel(), med)
+        q_arr, q_aba = _por_lado(exceso.ravel(), g_pas, ALFA)
+        w_arr, w_aba = q_arr * g_hoy, q_aba * g_hoy
     elif variante == "nivel":
         w_arr, w_aba = _por_tramos(H["med"].ravel(), exceso.ravel(), med, TRAMOS)
     elif variante == "nivel_bloque":
