@@ -48,6 +48,7 @@ def find_analogs(
     k: int = 40,
     separation: float = 0.5,
     metric: str = "pearson",
+    admisibles: Optional[np.ndarray] = None,
 ) -> Analogs:
     """
     Devuelve los k tramos pasados más parecidos al presente.
@@ -92,11 +93,18 @@ def find_analogs(
     with np.errstate(invalid="ignore", divide="ignore"):
         similarity = centered @ present_centered / (scales * present_scale)
     similarity[~np.isfinite(similarity)] = -np.inf
+    if admisibles is not None:
+        admisibles = np.asarray(admisibles, dtype=bool)
+        if len(admisibles) != last:
+            raise ValueError(f"la máscara tiene {len(admisibles)} posiciones y hay {last}")
+        similarity[~admisibles] = -np.inf
 
     if metric == "pearson":
         orden = np.argsort(-similarity, kind="stable")
     elif metric == "euclidiana":
         distancia = np.sqrt(((candidates - present) ** 2).sum(axis=1))
+        if admisibles is not None:
+            distancia[~admisibles] = np.inf
         orden = np.argsort(distancia, kind="stable")
     else:
         raise ValueError(f"métrica desconocida: {metric}")
