@@ -99,7 +99,7 @@ CORRIDAS = {
     "bench_prueba": None, "lear_prueba": None, "fundacion_Moirai": None,
     "err_picos": None, "err_lear": None, "err_t0-beta": None,
     "err_PatchTST-FM": None, "err_TiRex": None, "err_TimesFM-2.5": None,
-    "err_Moirai": None,
+    "err_Moirai": None, "err_MOMENT": None,
 }
 
 

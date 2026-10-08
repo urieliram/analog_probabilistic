@@ -53,6 +53,7 @@ ADAPTADORES = (
     ("TimesFM-2.5", "fundacion_timesfm"),
     ("TiRex", "fundacion_tirex"),
     ("Moirai", "fundacion_moirai"),
+    ("MOMENT", "fundacion_moment"),
 )
 
 
