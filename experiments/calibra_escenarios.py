@@ -38,6 +38,12 @@ anterior).
              forma; si el error crece como raíz abajo y más que lineal arriba, como se
              midió, este tramo por tramo lo captura.
 
+``nivel_bloque``  como ``nivel``, pero por bloque de horas del reloj (0-5, 6-11, 12-17,
+             18-23) y con cinco tramos de nivel dentro de cada bloque: unos 120 puntos
+             del pasado por celda. Se agregó después de ver que el nivel solo cubre de
+             más en la madrugada (0.95) y de menos en el pico de la tarde (0.83): a un
+             mismo nivel, la tarde se equivoca más.
+
 El piso de 100 pesos en ``raiz`` evita la raíz de precios negativos o casi cero. Los
 días con menos de 30 días de historia se omiten en TODAS las variantes, para que las
 comparaciones sean sobre los mismos días.
@@ -50,6 +56,9 @@ H2. ``raiz`` o ``nivel`` mejoran la CRPS ponderada de la cuenta del día respect
     ``proporcional`` (pesos uniforme y cola alta), método por método.
 H3. Después de un día conocido caro, la cobertura de la cuenta de los escenarios de
     errores se acerca a 0.90 con ``nivel``.
+H4. (declarada después de H1-H3, antes de correr ``nivel_bloque``) ``nivel_bloque``
+    reduce la diferencia de cobertura horaria entre la madrugada y la tarde respecto de
+    ``nivel``, y mejora la CRPS ponderada de la cuenta del día respecto de ``nivel``.
 Comparación principal entre métodos: Analog-mezcla contra t0-beta+errores, LEAR y
 PatchTST-FM+errores, cada uno con la MISMA variante.
 
@@ -74,7 +83,9 @@ from experiments.protocol import RESULTS  # noqa: E402
 from experiments.scores import pinball  # noqa: E402
 
 NIVELES = np.round(np.arange(0.05, 0.96, 0.05), 2)
-VARIANTES = ("crudo", "proporcional", "raiz", "nivel")
+VARIANTES = ("crudo", "proporcional", "raiz", "nivel", "nivel_bloque")
+BLOQUES = (range(0, 6), range(6, 12), range(12, 18), range(18, 24))
+TRAMOS_BLOQUE = 5
 PISO = 100.0
 TRAMOS = 10
 HISTORIA_MINIMA = 30
@@ -100,6 +111,18 @@ def _por_lado(exceso_pasado, escala_pasada, alfa):
             cuantil_conformal(abajo.ravel(), alfa / 2))
 
 
+def _por_tramos(med_pasado, exceso_pasado, med_hoy, tramos):
+    """Ancho por lado para cada hora de hoy, según el tramo de nivel en que cae."""
+    cortes = np.quantile(med_pasado, np.linspace(0, 1, tramos + 1)[1:-1])
+    tramo_pasado = np.searchsorted(cortes, med_pasado)
+    tramo_hoy = np.searchsorted(cortes, med_hoy)
+    w_arr, w_aba = np.empty(len(med_hoy)), np.empty(len(med_hoy))
+    for t in np.unique(tramo_hoy):
+        q_a, q_b = _por_lado(exceso_pasado[tramo_pasado == t], 1.0, ALFA)
+        w_arr[tramo_hoy == t], w_aba[tramo_hoy == t] = q_a, q_b
+    return w_arr, w_aba
+
+
 def factores(variante, H, med, arr, aba, disp):
     """Factor por hora y por lado que lleva el ensamble de hoy a la anchura objetivo."""
     exceso = H["obs"] - H["med"]
@@ -114,15 +137,14 @@ def factores(variante, H, med, arr, aba, disp):
         g = np.sqrt(np.maximum(med, PISO))
         w_arr, w_aba = q_arr * g, q_aba * g
     elif variante == "nivel":
-        pasado = H["med"].ravel()
-        cortes = np.quantile(pasado, np.linspace(0, 1, TRAMOS + 1)[1:-1])
-        tramo_pasado = np.searchsorted(cortes, pasado)
-        tramo_hoy = np.searchsorted(cortes, med)
-        e = exceso.ravel()
+        w_arr, w_aba = _por_tramos(H["med"].ravel(), exceso.ravel(), med, TRAMOS)
+    elif variante == "nivel_bloque":
         w_arr, w_aba = np.empty(len(med)), np.empty(len(med))
-        for t in np.unique(tramo_hoy):
-            q_a, q_b = _por_lado(e[tramo_pasado == t], 1.0, ALFA)
-            w_arr[tramo_hoy == t], w_aba[tramo_hoy == t] = q_a, q_b
+        for bloque in BLOQUES:
+            h = list(bloque)
+            w_arr[h], w_aba[h] = _por_tramos(H["med"][:, h].ravel(),
+                                             exceso[:, h].ravel(), med[h],
+                                             TRAMOS_BLOQUE)
     else:
         raise ValueError(variante)
     return w_arr / np.maximum(arr, MINIMO), w_aba / np.maximum(aba, MINIMO)
@@ -247,7 +269,7 @@ def calcula(solo_una_zona: bool = False) -> None:
 CLAVE = ["Analog-mezcla", "Analog", "t0-beta+errores", "PatchTST-FM+errores", "LEAR",
          "Moirai", "Moirai+errores"]
 RIVALES = ["LEAR", "t0-beta+errores", "PatchTST-FM+errores"]
-CALIBRADAS = ("proporcional", "raiz", "nivel")
+CALIBRADAS = ("proporcional", "raiz", "nivel", "nivel_bloque")
 
 
 def analiza() -> None:
@@ -301,7 +323,7 @@ def analiza() -> None:
     print("(por ciento de proporcional; negativo = mejor que el ajuste lineal)")
     filas = []
     for m in sorted(t.metodo.unique()):
-        for v in ("raiz", "nivel"):
+        for v in ("raiz", "nivel", "nivel_bloque"):
             for medida in ["qw_uniforme", "qw_cola_alta", "qw_cola_baja", "pin_0.95",
                            "pin_0.05"]:
                 r = compara(x, f"{m} | {v}", f"{m} | proporcional", medida)
@@ -350,6 +372,34 @@ def analiza() -> None:
                                                  columns="dk", values="cob_cuenta")
     tabla.round(4).to_csv(pub / "cuadro_calibrados_dia_conocido.csv")
     print(tabla.round(3).to_string())
+
+    print("\n=== H4. nivel_bloque contra nivel ===")
+    print("cobertura horaria por bloque de horas (lo prometido es 0.90)")
+    hb = pd.read_csv(POR_HORA)
+    hb["bloque"] = hb.hora // 6
+    hb = hb.groupby(["metodo", "variante", "bloque"])[["cubre", "ancho", "n"]].sum()
+    hb["cubre"], hb["ancho"] = hb.cubre / hb.n, hb.ancho / hb.n
+    hb.round(3).to_csv(pub / "cuadro_calibrados_por_bloque.csv")
+    for m in ["Analog-mezcla", "t0-beta+errores", "PatchTST-FM+errores", "LEAR"]:
+        a = hb.loc[m]
+        tabla = pd.DataFrame({v: [f"{r.ancho:6.0f} ({r.cubre:.2f})" for r in
+                                  a.loc[v].itertuples()]
+                              for v in ("proporcional", "nivel", "nivel_bloque")},
+                             index=["0-5 h", "6-11 h", "12-17 h", "18-23 h"])
+        print(f"\n--- {m}: ancho (cobertura) ---")
+        print(tabla.to_string())
+    filas = []
+    for m in sorted(t.metodo.unique()):
+        for medida in ["qw_uniforme", "qw_cola_alta", "qw_cola_baja"]:
+            r = compara(x, f"{m} | nivel_bloque", f"{m} | nivel", medida)
+            r.update({"metodo_base": m})
+            filas.append(r)
+    h4 = pd.DataFrame(filas)
+    h4.round(4).to_csv(pub / "cuadro_calibrados_h4.csv", index=False)
+    print("\nnivel_bloque menos nivel, en % de nivel (negativo = mejor):")
+    for m, g in h4.groupby("metodo_base"):
+        print(f"  {m:30s} " + "  ".join(f"{r.medida[3:]}: {r.pct:+.1f} ({r.t:+.1f})"
+                                       for r in g.itertuples()))
 
 
 if __name__ == "__main__":
