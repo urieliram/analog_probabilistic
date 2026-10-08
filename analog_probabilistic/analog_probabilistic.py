@@ -47,9 +47,17 @@ def find_analogs(
     horizon: int,
     k: int = 40,
     separation: float = 0.5,
+    metric: str = "pearson",
 ) -> Analogs:
     """
-    Devuelve los k tramos pasados más correlacionados con el presente.
+    Devuelve los k tramos pasados más parecidos al presente.
+
+    ``metric="pearson"`` mide sólo la forma: centra y escala cada ventana, de modo que
+    tres días caros y tres días baratos con la misma forma se parecen igual.
+    ``metric="euclidiana"`` mide forma y nivel a la vez, sobre los precios crudos: un
+    análogo cercano tuvo la misma forma y precios parecidos. En los dos casos
+    ``similarities`` devuelve la correlación de Pearson de cada análogo elegido, para
+    que el mapa de miembro (que la usa con el exponente gamma) signifique lo mismo.
 
     La regla de separación descarta un candidato que empiece a menos de
     ``separation * window`` posiciones de uno ya aceptado, para que el ensamble
@@ -85,11 +93,23 @@ def find_analogs(
         similarity = centered @ present_centered / (scales * present_scale)
     similarity[~np.isfinite(similarity)] = -np.inf
 
+    if metric == "pearson":
+        orden = np.argsort(-similarity, kind="stable")
+    elif metric == "euclidiana":
+        distancia = np.sqrt(((candidates - present) ** 2).sum(axis=1))
+        orden = np.argsort(distancia, kind="stable")
+    else:
+        raise ValueError(f"métrica desconocida: {metric}")
+
     positions: list[int] = []
     gap = separation * window
-    for pos in np.argsort(-similarity, kind="stable"):
-        if similarity[pos] <= 0:
+    for pos in orden:
+        ## con Pearson, una correlación no positiva no es un análogo; con la distancia
+        ## euclidiana no hay ese corte, pero sí se descarta una ventana constante
+        if metric == "pearson" and similarity[pos] <= 0:
             break
+        if metric == "euclidiana" and not np.isfinite(similarity[pos]):
+            continue
         if any(abs(pos - taken) < gap for taken in positions):
             continue
         positions.append(int(pos))
@@ -97,7 +117,7 @@ def find_analogs(
             break
 
     if not positions:
-        raise ValueError("ningún análogo con correlación positiva")
+        raise ValueError("ningún análogo admisible")
 
     idx = np.array(positions)
     return Analogs(
