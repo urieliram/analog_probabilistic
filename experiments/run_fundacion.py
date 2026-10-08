@@ -92,7 +92,7 @@ def main() -> None:
         origenes = build_origins(TEST_START, TEST_END, serie)
         if args.origenes:
             origenes = origenes[: args.origenes]
-        fallos = 0
+        fallos, primer_error = 0, None
         for origen in origenes:
             historia = serie.loc[:origen].values[-SEARCH_YEARS * 8760:]
             observado = serie.loc[origen + pd.Timedelta(hours=1):
@@ -103,8 +103,10 @@ def main() -> None:
             try:
                 cuantiles, miembros = adaptador.predice(modelo, historia, HORIZON,
                                                         list(LEVELS))
-            except Exception:
+            except Exception as error:
                 fallos += 1
+                if primer_error is None:
+                    primer_error = f"{type(error).__name__}: {error}"
                 continue
             almacen.add(zona, origen, args.modelo, np.asarray(cuantiles, dtype=float),
                         observado, miembros, time.time() - t)
@@ -112,6 +114,31 @@ def main() -> None:
         aviso = f"  ({fallos} fallos)" if fallos else ""
         print(f"  {numero}/{len(zonas)} {zona:20s} {parte.get('filas', 0):,d} filas"
               f"{aviso}  (total {time.time() - comienzo:6.0f}s)", flush=True)
+
+        ## Una zona que falla COMPLETA no es un tropiezo: es la corrida rota. Moirai
+        ## falló así de la zona 13 en adelante —la memoria de la tarjeta se agotó tras
+        ## trece zonas de mil escenarios por origen— y como cada fallo se contaba y se
+        ## seguía, la corrida terminó con código cero habiendo producido la mitad del
+        ## panel. El cuadro comparativo mostró a Moirai sobre 13 zonas junto a los demás
+        ## sobre 25, sin que nada lo dijera.
+        if parte.get("filas", 0) == 0:
+            raise SystemExit(
+                f"\nLA ZONA {zona} FALLÓ COMPLETA: {fallos} fallos de {fallos}.\n"
+                f"Primer error: {primer_error}\n"
+                f"La corrida se detiene aquí en vez de producir medio panel en "
+                f"silencio. Las zonas ya escritas se conservan y la corrida se puede "
+                f"relanzar: se saltan solas.")
+        if fallos > len(origenes) // 20:
+            print(f"      AVISO: {fallos} de {len(origenes)} orígenes fallaron. "
+                  f"Primer error: {primer_error}", flush=True)
+
+        ## se libera la memoria de la tarjeta entre zonas, que es lo que se agotó
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
 
     print(f"\nescrito en {destino.with_suffix('')}")
 

@@ -109,9 +109,24 @@ def _de_una_zona(ruta: Path, parte: Path, perfil: np.ndarray) -> list:
                 "dentro_90": bool(cuantiles[0] <= real <= cuantiles[6]),
                 "dentro_80": bool(cuantiles[1] <= real <= cuantiles[5]),
                 "se_pasa_arriba": bool(real > cuantiles[6]),
+                ## Cuánto te quedaste CORTO, en pesos: la cuenta real menos el techo
+                ## que el método anunció. Es la cifra que le importa a quien se cubre,
+                ## porque es el dinero que no estaba presupuestado. Cero cuando la
+                ## cuenta cayó dentro.
+                "faltante": float(max(real - cuantiles[6], 0.0)),
                 "pinball": float(np.mean([
                     pinball(np.array([real]), np.array([q]), a)[0]
                     for q, a in zip(cuantiles, NIVELES)]))}
+        ## La pérdida pinball de la cuenta a CADA nivel, por separado. Es lo que permite
+        ## evaluar con un puntaje propio a un comprador de pérdida asimétrica: si quedarse
+        ## corto le cuesta c_u y pasarse le cuesta c_o, su reserva óptima es el cuantil
+        ## tau = c_u / (c_u + c_o) de la cuenta, y el puntaje propio para esa decisión es
+        ## la pinball a ese nivel tau, sobre TODOS los días, sin condicionar en lo que
+        ## pasó. Condicionar en los días que resultaron caros premia al que siempre
+        ## pronostica alto (el dilema del pronosticador, Lerch et al. 2017).
+        for q, a in zip(cuantiles, NIVELES):
+            fila[f"pin_{a:g}"] = float(pinball(np.array([real]), np.array([q]), a)[0])
+            fila[f"cq_{a:g}"] = float(q)
         filas.append(fila)
     return filas, saltados
 
@@ -142,15 +157,50 @@ def main() -> None:
         t = t[t.no_puede != True]  # noqa: E712
     if t.empty:
         raise SystemExit("ningún método del banco entregó escenarios")
-    resumen = t.groupby("metodo").agg(
-        dias=("costo_real", "size"), escenarios=("costo_real", "size"),
-        cubre_90=("dentro_90", "mean"), cubre_80=("dentro_80", "mean"),
-        se_pasa_arriba=("se_pasa_arriba", "mean"),
-        ancho_90=("ancho_90", "mean"), pinball=("pinball", "mean"))
-    resumen = resumen.drop(columns=["escenarios"])
-    print("\n=== cobertura del COSTO DEL DÍA, perfil plano ===")
-    print("se prometió cubrir 0.90 y que se pase por arriba 0.05\n")
-    print(resumen.sort_values("cubre_90", ascending=False).round(4).to_string())
+    def tabla(sub: pd.DataFrame) -> pd.DataFrame:
+        r = sub.groupby("metodo").agg(
+            dias=("costo_real", "size"),
+            cubre_90=("dentro_90", "mean"), se_pasa_arriba=("se_pasa_arriba", "mean"),
+            falta_pesos=("faltante", "mean"), cuenta=("costo_real", "mean"),
+            ancho_90=("ancho_90", "mean"), pinball=("pinball", "mean"))
+        r["falta_pct_de_la_cuenta"] = 100 * r.falta_pesos / r.cuenta
+        return r
+
+    print("\n=== LA CUENTA DEL DÍA ===")
+    print("perfil plano de una unidad por hora, así que la cuenta del día es la SUMA")
+    print("de los 24 precios. 'cubre_90' es la fracción de días en que la cuenta real")
+    print("cayó dentro del intervalo anunciado: se prometió 0.90. 'falta_pesos' es")
+    print("cuánto te quedaste corto respecto del techo anunciado, en pesos, y es cero")
+    print("cuando la cuenta cayó dentro.")
+    print("\nmás es mejor: cubre_90.   menos es mejor: se_pasa_arriba, falta_pesos,")
+    print("ancho_90, pinball.\n")
+    print("--- todos los días ---")
+    print(tabla(t).sort_values("falta_pesos").round(2).to_string())
+
+    ## Se guarda el detalle por día, no sólo el resumen: mirar otro corte —por decil,
+    ## por año, por zona— no debe costar otra pasada sobre los escenarios, que son
+    ## gigabytes. Por no tenerlo hubo que recalcular sólo para ver el decil caro.
+    detalle = RESULTS / "costo_diario_por_dia.parquet"
+    t.to_parquet(detalle, index=False)
+    print(f"\n(detalle por día en {detalle.name}: {len(t):,d} filas)")
+
+    ## Los deciles se cortan sobre la cuenta REAL de cada día, con los cortes comunes a
+    ## todos los métodos: si cada método cortara por su propia distribución, los deciles
+    ## no serían los mismos días y las filas no se podrían comparar.
+    cortes = t.costo_real.quantile(np.arange(0, 1.01, 0.1)).to_numpy()
+    t["decil"] = np.clip(np.searchsorted(cortes[1:-1], t.costo_real) + 1, 1, 10)
+
+    print("\n--- por decil de la cuenta del día: cuánto te quedas corto, en pesos ---")
+    print("el decil 10 son los días más caros\n")
+    print(t.pivot_table(index="metodo", columns="decil", values="faltante")
+          .round(0).to_string())
+    print("\n--- por decil: cobertura de la cuenta, se prometió 0.90 ---\n")
+    print(t.pivot_table(index="metodo", columns="decil", values="dentro_90")
+          .round(3).to_string())
+    print("\n--- los tres deciles más caros, ordenados por el pesos que faltan ---\n")
+    cerca = tabla(t[t.decil >= 8]).sort_values("falta_pesos")
+    print(cerca.round(2).to_string())
+    resumen = tabla(t)
     salida = RESULTS / "costo_diario.csv"
     resumen.round(6).to_csv(salida)
     print(f"\nescrito {salida.name}")
