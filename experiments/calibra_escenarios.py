@@ -96,7 +96,7 @@ POR_NIVEL = RESULTS / "calibrados_por_nivel.csv"
 ## qué métodos se toman de cada corrida; "Analog" está en dos corridas y se toma una vez
 CORRIDAS = {
     "picos_prueba": None, "forecasts_prueba": ["Analog-minimos-cuadrados"],
-    "memoria_larga": None, "euclidiana": None,
+    "memoria_larga": None, "euclidiana": None, "ventanas": None, "combinados": None,
     "bench_prueba": None, "lear_prueba": None, "fundacion_Moirai": None,
     "err_picos": None, "err_lear": None, "err_t0-beta": None,
     "err_PatchTST-FM": None, "err_TiRex": None, "err_TimesFM-2.5": None,
@@ -231,13 +231,14 @@ def _una_tarea(args):
     return filas, horas, tramos, f"{corrida}/{parte.stem}"
 
 
-def calcula(solo_una_zona: bool = False) -> None:
+def calcula(solo_una_zona: bool = False, solo=None, sufijo_salida: str = "") -> None:
     ## cortes comunes de nivel para el desglose por hora: deciles del precio observado
     obs = pd.concat(pd.read_parquet(f, columns=["observed"])
                     for f in sorted((RESULTS / "lear_prueba").glob("*.parquet")))
     cortes_nivel = np.quantile(obs.observed, np.linspace(0, 1, 11)[1:-1])
     tareas = []
-    for corrida, metodos in CORRIDAS.items():
+    corridas = {c: CORRIDAS.get(c) for c in solo} if solo else CORRIDAS
+    for corrida, metodos in corridas.items():
         partes = sorted((RESULTS / f"{corrida}_members").glob("*.parquet"))
         if solo_una_zona:
             partes = partes[:1]
@@ -253,7 +254,7 @@ def calcula(solo_una_zona: bool = False) -> None:
             tramos += t
             if i % 20 == 0 or i == len(tareas):
                 print(f"  {i}/{len(tareas)} {nombre}", flush=True)
-    sufijo = "_prueba" if solo_una_zona else ""
+    sufijo = "_prueba" if solo_una_zona else sufijo_salida
     pd.DataFrame(filas).to_parquet(str(DETALLE).replace(".parquet", f"{sufijo}.parquet"),
                                    index=False)
     pd.DataFrame(horas).to_csv(str(POR_HORA).replace(".csv", f"{sufijo}.csv"), index=False)
@@ -411,5 +412,10 @@ if __name__ == "__main__":
         calcula()
     elif modo == "prueba":
         calcula(solo_una_zona=True)
+    elif modo == "solo":
+        ## calibra sólo las corridas nombradas, hacia archivos con sufijo propio, sin
+        ## rehacer el banco entero; se comparan sobre los mismos días porque la regla de
+        ## historia mínima es la misma
+        calcula(solo=sys.argv[3:], sufijo_salida=f"_{sys.argv[2]}")
     elif modo == "analiza":
         analiza()
