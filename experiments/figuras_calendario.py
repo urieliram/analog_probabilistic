@@ -3,7 +3,7 @@ Las figuras del artículo con la configuración de calendario: el método análo
 continuaciones del mismo tipo de día, y los escenarios de errores de t0-beta usan sólo
 errores pasados del mismo tipo de día.
 
-Tres figuras:
+Cinco figuras:
 1. ``figura_anunciados_caros_calendario.png``: los mismos cuatro días de la figura de días
    que se anunciaban caros (regla sin mirar el resultado), con los métodos con calendario.
 2. ``figura_domingos_calendario.png``: cuatro domingos fijados de antemano, sin mirar el
@@ -13,6 +13,14 @@ Tres figuras:
    domingo con la forma de un día laborable.
 3. ``figura_ancho_por_hora_calendario.png``: ancho y cobertura por hora con cada
    calibración, para t0-beta y el análogo, los dos con calendario.
+4. ``figura_festivos_calendario.png``: cuatro festivos entre semana escogidos antes de
+   mirar el resultado de cada método en ellos (1 de mayo de 2023, 16 de septiembre de
+   2024, 25 de diciembre de 2024 y 1 de enero de 2025) en cuatro zonas de regiones
+   distintas, con el análogo sin y con calendario y t0-beta con calendario. El filtro
+   trata el festivo como domingo; la mediana de t0-beta no sabe que es festivo, aunque
+   sus errores sí vienen de domingos y festivos pasados.
+5. ``figura_dias_sorteados_calendario.png``: cuatro días sorteados del tramo de prueba
+   con semilla fija, de zonas y meses distintos, con los tres métodos con calendario.
 
 Usa las mismas funciones de ``figuras_calibradas.py``: escenarios calibrados por nivel y
 bloque de horas con los cien días previos, y la cuenta del día calculada sumando cada
@@ -69,6 +77,35 @@ def domingos():
                 ## el origen es la hora 23 del día anterior al pronosticado
                 dias.append((zona, fecha - pd.Timedelta(hours=1)))
                 break
+    return dias
+
+
+FESTIVOS_ELEGIDOS = [("villahermosa", "2023-05-01"), ("hermosillo", "2024-09-16"),
+                     ("tampico", "2024-12-25"), ("zamora", "2025-01-01")]
+SEMILLA_SORTEO = 20261008
+
+
+def festivos_elegidos():
+    return [(z, pd.Timestamp(f) - pd.Timedelta(hours=1)) for z, f in FESTIVOS_ELEGIDOS]
+
+
+def dias_sorteados(cuantos=4):
+    """Días al azar del tramo de prueba, con semilla fija, de zonas y meses distintos."""
+    import numpy as np
+    from experiments.protocol import load_selected_zones
+    zonas = load_selected_zones()["zonas"]
+    t = pd.read_parquet(RESULTS / "calendario" / f"{zonas[0]}.parquet", columns=["origin"])
+    origenes = sorted(t.origin.unique())[40:]
+    rng = np.random.default_rng(SEMILLA_SORTEO)
+    vistos, dias = set(), []
+    while len(dias) < cuantos:
+        zona = zonas[rng.integers(len(zonas))]
+        origen = pd.Timestamp(origenes[rng.integers(len(origenes))])
+        mes = origen.strftime("%Y-%m")
+        if zona in vistos or mes in vistos:
+            continue
+        vistos.update({zona, mes})
+        dias.append((zona, origen))
     return dias
 
 
@@ -141,8 +178,23 @@ def main():
                        comun + "Días fijados antes de mirar el resultado: el primer domingo no "
                        "festivo de marzo, junio, septiembre y diciembre de 2024, en cuatro "
                        "zonas de regiones distintas.")
+    fc.calibrados.cache_clear()
+    _con(DOMINGOS, COLORES_CAL)
+    r4 = fc.una_figura(festivos_elegidos(), "figura_festivos_calendario.png",
+                       "Cuatro festivos entre semana: el análogo sin y con calendario",
+                       comun + "Festivos escogidos antes de mirar el resultado: 1 de mayo de "
+                       "2023, 16 de septiembre de 2024, 25 de diciembre de 2024 y 1 de enero "
+                       "de 2025, en cuatro zonas de regiones distintas. El filtro trata el "
+                       "festivo como domingo; la mediana de t0-beta no sabe que es festivo, "
+                       "aunque sus errores sí vienen de domingos y festivos pasados.")
+    fc.calibrados.cache_clear()
+    _con(CON_CALENDARIO, COLORES_CAL)
+    r5 = fc.una_figura(dias_sorteados(), "figura_dias_sorteados_calendario.png",
+                       "Cuatro días cualquiera, sorteados, con calendario para todos",
+                       comun + f"Días sorteados del tramo de prueba con semilla fija "
+                       f"({SEMILLA_SORTEO}), de zonas y meses distintos.")
     r3 = figura_por_hora()
-    for r in (r1, r2, r3):
+    for r in (r1, r2, r3, r4, r5):
         print("escrito", r)
 
 

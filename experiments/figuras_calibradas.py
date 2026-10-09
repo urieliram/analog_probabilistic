@@ -142,7 +142,7 @@ def una_figura(dias, nombre, titulo, nota):
         abajo.set_ylim(0.4, len(cuentas) + 0.75)
         abajo.xaxis.set_major_locator(MaxNLocator(5))
         abajo.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v / 1000:,.0f}"))
-        abajo.set_xlabel("cuenta del día, miles de pesos (suma de los 24 precios)")
+        abajo.set_xlabel("cuenta del día, miles de pesos\n(suma de los 24 precios)")
         abajo.grid(alpha=0.25, lw=0.5, axis="x")
         abajo.set_title(f"cuenta real: {cuenta_real:,.0f}", fontsize=9)
     ejes[0, 0].set_ylabel("precio, pesos por MWh")
