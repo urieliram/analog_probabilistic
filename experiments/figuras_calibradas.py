@@ -113,7 +113,10 @@ def una_figura(dias, nombre, titulo, nota):
             q05, q50, q95 = np.quantile(E, [0.05, 0.5, 0.95], axis=0)
             arriba.fill_between(horas, q05, q95, alpha=0.12, color=COLORES[etiqueta],
                                 linewidth=0)
-            arriba.plot(horas, q95, color=COLORES[etiqueta], lw=1.8, label=etiqueta)
+            ## la mediana es el pronóstico puntual y va en línea gruesa; los bordes del 90%
+            ## van delgados, para que nadie lea el borde de arriba como el pronóstico
+            arriba.plot(horas, q50, color=COLORES[etiqueta], lw=2.0, label=etiqueta)
+            arriba.plot(horas, q95, color=COLORES[etiqueta], lw=0.8)
             arriba.plot(horas, q05, color=COLORES[etiqueta], lw=0.8, ls=":")
             sumas = E.sum(axis=1)
             cuentas[etiqueta] = np.quantile(sumas, [0.05, 0.5, 0.95])
@@ -244,8 +247,8 @@ def figura_por_hora():
 
 def main():
     comun = ("Los tres métodos con sus escenarios calibrados por nivel y bloque de horas, "
-             "con lo observado en los 100 días previos. ARRIBA: banda del 90% por hora; "
-             "línea gruesa, borde de arriba; punteada, borde de abajo. ABAJO: intervalo "
+             "con lo observado en los 100 días previos. ARRIBA: mediana en línea gruesa y "
+             "banda del 90% por hora (delgada, borde de arriba; punteada, borde de abajo). ABAJO: intervalo "
              "del 90% del COSTO DEL DÍA (comprar 1 MWh en cada hora), calculado sumando "
              "cada escenario; el punto es "
              "la mediana y la línea negra, el costo real. ")

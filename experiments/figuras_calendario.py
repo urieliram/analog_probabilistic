@@ -167,8 +167,8 @@ def figura_por_hora():
 
 def main():
     comun = ("Escenarios calibrados por nivel y bloque de horas con los 100 días previos. "
-             "ARRIBA: banda del 90% por hora; línea gruesa, borde de arriba; punteada, "
-             "borde de abajo. ABAJO: intervalo del 90% del COSTO DEL DÍA (comprar 1 MWh "
+             "ARRIBA: mediana en línea gruesa y banda del 90% por hora (delgada, borde de "
+             "arriba; punteada, borde de abajo). ABAJO: intervalo del 90% del COSTO DEL DÍA (comprar 1 MWh "
              "en cada hora), calculado sumando cada escenario; el punto es la mediana y "
              "la línea negra, el costo real. ")
     _con(CON_CALENDARIO, COLORES_CAL)
