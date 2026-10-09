@@ -49,6 +49,27 @@ corrected us.
 
 Same text in Spanish: [README_es.md](README_es.md).
 
+## Gallery: sixteen random days per load zone
+
+For each of the 25 load zones of the panel, sixteen days drawn at random from the test
+period (April 2021 to February 2026), from different months, with a fixed seed per
+zone. Each panel shows the 24 hours of the day: the median of each method as a thick
+line, its 90% band shaded, and the observed price in black. At the top left, how many
+of the 24 hours fell inside each method's band. The methods are the analog method with
+calendar, LEAR, t0-beta with calendar-aware error scenarios, and the combination that
+averages the centers of t0-beta and the analog, the champion of the paper. All
+scenarios are calibrated by level and hour block with the previous 100 days. Labels
+are in Spanish. Click a thumbnail to open the full figure; they are drawn by
+`python experiments/figuras_calendario.py galeria`.
+
+<table>
+<tr><td align="center"><a href="figuras/galeria/caborca.png"><img src="figuras/galeria/caborca.png" width="170" alt="caborca"></a><br><sub>Caborca</sub></td><td align="center"><a href="figuras/galeria/centro_oriente.png"><img src="figuras/galeria/centro_oriente.png" width="170" alt="centro_oriente"></a><br><sub>Centro Oriente</sub></td><td align="center"><a href="figuras/galeria/centro_sur.png"><img src="figuras/galeria/centro_sur.png" width="170" alt="centro_sur"></a><br><sub>Centro Sur</sub></td><td align="center"><a href="figuras/galeria/chihuahua.png"><img src="figuras/galeria/chihuahua.png" width="170" alt="chihuahua"></a><br><sub>Chihuahua</sub></td><td align="center"><a href="figuras/galeria/chilpancingo.png"><img src="figuras/galeria/chilpancingo.png" width="170" alt="chilpancingo"></a><br><sub>Chilpancingo</sub></td></tr>
+<tr><td align="center"><a href="figuras/galeria/coatzacoalcos.png"><img src="figuras/galeria/coatzacoalcos.png" width="170" alt="coatzacoalcos"></a><br><sub>Coatzacoalcos</sub></td><td align="center"><a href="figuras/galeria/culiacan.png"><img src="figuras/galeria/culiacan.png" width="170" alt="culiacan"></a><br><sub>Culiacan</sub></td><td align="center"><a href="figuras/galeria/durango.png"><img src="figuras/galeria/durango.png" width="170" alt="durango"></a><br><sub>Durango</sub></td><td align="center"><a href="figuras/galeria/fresnillo.png"><img src="figuras/galeria/fresnillo.png" width="170" alt="fresnillo"></a><br><sub>Fresnillo</sub></td><td align="center"><a href="figuras/galeria/hermosillo.png"><img src="figuras/galeria/hermosillo.png" width="170" alt="hermosillo"></a><br><sub>Hermosillo</sub></td></tr>
+<tr><td align="center"><a href="figuras/galeria/ixmiquilpan.png"><img src="figuras/galeria/ixmiquilpan.png" width="170" alt="ixmiquilpan"></a><br><sub>Ixmiquilpan</sub></td><td align="center"><a href="figuras/galeria/mazatlan.png"><img src="figuras/galeria/mazatlan.png" width="170" alt="mazatlan"></a><br><sub>Mazatlan</sub></td><td align="center"><a href="figuras/galeria/merida.png"><img src="figuras/galeria/merida.png" width="170" alt="merida"></a><br><sub>Merida</sub></td><td align="center"><a href="figuras/galeria/navojoa.png"><img src="figuras/galeria/navojoa.png" width="170" alt="navojoa"></a><br><sub>Navojoa</sub></td><td align="center"><a href="figuras/galeria/nuevo_laredo.png"><img src="figuras/galeria/nuevo_laredo.png" width="170" alt="nuevo_laredo"></a><br><sub>Nuevo Laredo</sub></td></tr>
+<tr><td align="center"><a href="figuras/galeria/obregon.png"><img src="figuras/galeria/obregon.png" width="170" alt="obregon"></a><br><sub>Obregon</sub></td><td align="center"><a href="figuras/galeria/poza_rica.png"><img src="figuras/galeria/poza_rica.png" width="170" alt="poza_rica"></a><br><sub>Poza Rica</sub></td><td align="center"><a href="figuras/galeria/tampico.png"><img src="figuras/galeria/tampico.png" width="170" alt="tampico"></a><br><sub>Tampico</sub></td><td align="center"><a href="figuras/galeria/tecamachalco.png"><img src="figuras/galeria/tecamachalco.png" width="170" alt="tecamachalco"></a><br><sub>Tecamachalco</sub></td><td align="center"><a href="figuras/galeria/tepic_vallarta.png"><img src="figuras/galeria/tepic_vallarta.png" width="170" alt="tepic_vallarta"></a><br><sub>Tepic Vallarta</sub></td></tr>
+<tr><td align="center"><a href="figuras/galeria/teziutlan.png"><img src="figuras/galeria/teziutlan.png" width="170" alt="teziutlan"></a><br><sub>Teziutlan</sub></td><td align="center"><a href="figuras/galeria/veracruz.png"><img src="figuras/galeria/veracruz.png" width="170" alt="veracruz"></a><br><sub>Veracruz</sub></td><td align="center"><a href="figuras/galeria/victoria.png"><img src="figuras/galeria/victoria.png" width="170" alt="victoria"></a><br><sub>Victoria</sub></td><td align="center"><a href="figuras/galeria/villahermosa.png"><img src="figuras/galeria/villahermosa.png" width="170" alt="villahermosa"></a><br><sub>Villahermosa</sub></td><td align="center"><a href="figuras/galeria/zamora.png"><img src="figuras/galeria/zamora.png" width="170" alt="zamora"></a><br><sub>Zamora</sub></td></tr>
+</table>
+
 ## The member map
 
 Writing each member as `y = a + b·x`, three slopes are of interest, and they
@@ -205,27 +226,6 @@ The analog method is also 2,400 times faster than AutoARIMA, which it beats on
 every score. The search compares the present window against every candidate in
 one matrix product; the loop-based version used while the method was developed
 returns the same ensemble to within 5e-13 and takes about fifty times longer.
-
-## Gallery: sixteen random days per load zone
-
-For each of the 25 load zones of the panel, sixteen days drawn at random from the test
-period (April 2021 to February 2026), from different months, with a fixed seed per
-zone. Each panel shows the 24 hours of the day: the median of each method as a thick
-line, its 90% band shaded, and the observed price in black. At the top left, how many
-of the 24 hours fell inside each method's band. The methods are the analog method with
-calendar, LEAR, t0-beta with calendar-aware error scenarios, and the combination that
-averages the centers of t0-beta and the analog, the champion of the paper. All
-scenarios are calibrated by level and hour block with the previous 100 days. Labels
-are in Spanish. Click a thumbnail to open the full figure; they are drawn by
-`python experiments/figuras_calendario.py galeria`.
-
-<table>
-<tr><td align="center"><a href="figuras/galeria/caborca.png"><img src="figuras/galeria/caborca.png" width="170" alt="caborca"></a><br><sub>Caborca</sub></td><td align="center"><a href="figuras/galeria/centro_oriente.png"><img src="figuras/galeria/centro_oriente.png" width="170" alt="centro_oriente"></a><br><sub>Centro Oriente</sub></td><td align="center"><a href="figuras/galeria/centro_sur.png"><img src="figuras/galeria/centro_sur.png" width="170" alt="centro_sur"></a><br><sub>Centro Sur</sub></td><td align="center"><a href="figuras/galeria/chihuahua.png"><img src="figuras/galeria/chihuahua.png" width="170" alt="chihuahua"></a><br><sub>Chihuahua</sub></td><td align="center"><a href="figuras/galeria/chilpancingo.png"><img src="figuras/galeria/chilpancingo.png" width="170" alt="chilpancingo"></a><br><sub>Chilpancingo</sub></td></tr>
-<tr><td align="center"><a href="figuras/galeria/coatzacoalcos.png"><img src="figuras/galeria/coatzacoalcos.png" width="170" alt="coatzacoalcos"></a><br><sub>Coatzacoalcos</sub></td><td align="center"><a href="figuras/galeria/culiacan.png"><img src="figuras/galeria/culiacan.png" width="170" alt="culiacan"></a><br><sub>Culiacan</sub></td><td align="center"><a href="figuras/galeria/durango.png"><img src="figuras/galeria/durango.png" width="170" alt="durango"></a><br><sub>Durango</sub></td><td align="center"><a href="figuras/galeria/fresnillo.png"><img src="figuras/galeria/fresnillo.png" width="170" alt="fresnillo"></a><br><sub>Fresnillo</sub></td><td align="center"><a href="figuras/galeria/hermosillo.png"><img src="figuras/galeria/hermosillo.png" width="170" alt="hermosillo"></a><br><sub>Hermosillo</sub></td></tr>
-<tr><td align="center"><a href="figuras/galeria/ixmiquilpan.png"><img src="figuras/galeria/ixmiquilpan.png" width="170" alt="ixmiquilpan"></a><br><sub>Ixmiquilpan</sub></td><td align="center"><a href="figuras/galeria/mazatlan.png"><img src="figuras/galeria/mazatlan.png" width="170" alt="mazatlan"></a><br><sub>Mazatlan</sub></td><td align="center"><a href="figuras/galeria/merida.png"><img src="figuras/galeria/merida.png" width="170" alt="merida"></a><br><sub>Merida</sub></td><td align="center"><a href="figuras/galeria/navojoa.png"><img src="figuras/galeria/navojoa.png" width="170" alt="navojoa"></a><br><sub>Navojoa</sub></td><td align="center"><a href="figuras/galeria/nuevo_laredo.png"><img src="figuras/galeria/nuevo_laredo.png" width="170" alt="nuevo_laredo"></a><br><sub>Nuevo Laredo</sub></td></tr>
-<tr><td align="center"><a href="figuras/galeria/obregon.png"><img src="figuras/galeria/obregon.png" width="170" alt="obregon"></a><br><sub>Obregon</sub></td><td align="center"><a href="figuras/galeria/poza_rica.png"><img src="figuras/galeria/poza_rica.png" width="170" alt="poza_rica"></a><br><sub>Poza Rica</sub></td><td align="center"><a href="figuras/galeria/tampico.png"><img src="figuras/galeria/tampico.png" width="170" alt="tampico"></a><br><sub>Tampico</sub></td><td align="center"><a href="figuras/galeria/tecamachalco.png"><img src="figuras/galeria/tecamachalco.png" width="170" alt="tecamachalco"></a><br><sub>Tecamachalco</sub></td><td align="center"><a href="figuras/galeria/tepic_vallarta.png"><img src="figuras/galeria/tepic_vallarta.png" width="170" alt="tepic_vallarta"></a><br><sub>Tepic Vallarta</sub></td></tr>
-<tr><td align="center"><a href="figuras/galeria/teziutlan.png"><img src="figuras/galeria/teziutlan.png" width="170" alt="teziutlan"></a><br><sub>Teziutlan</sub></td><td align="center"><a href="figuras/galeria/veracruz.png"><img src="figuras/galeria/veracruz.png" width="170" alt="veracruz"></a><br><sub>Veracruz</sub></td><td align="center"><a href="figuras/galeria/victoria.png"><img src="figuras/galeria/victoria.png" width="170" alt="victoria"></a><br><sub>Victoria</sub></td><td align="center"><a href="figuras/galeria/villahermosa.png"><img src="figuras/galeria/villahermosa.png" width="170" alt="villahermosa"></a><br><sub>Villahermosa</sub></td><td align="center"><a href="figuras/galeria/zamora.png"><img src="figuras/galeria/zamora.png" width="170" alt="zamora"></a><br><sub>Zamora</sub></td></tr>
-</table>
 
 ## Paper
 
