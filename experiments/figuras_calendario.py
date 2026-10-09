@@ -23,7 +23,7 @@ Cinco figuras:
    con semilla fija, de zonas y meses distintos, con los tres métodos con calendario.
 
 Usa las mismas funciones de ``figuras_calibradas.py``: escenarios calibrados por nivel y
-bloque de horas con los cien días previos, y la cuenta del día calculada sumando cada
+bloque de horas con los cien días previos, y el costo del día calculado sumando cada
 escenario.
 """
 
@@ -162,9 +162,9 @@ def figura_por_hora():
 def main():
     comun = ("Escenarios calibrados por nivel y bloque de horas con los 100 días previos. "
              "ARRIBA: banda del 90% por hora; línea gruesa, borde de arriba; punteada, "
-             "borde de abajo. ABAJO: intervalo del 90% de la CUENTA DEL DÍA, calculado "
-             "sumando cada escenario; el punto es la mediana y la línea negra, la cuenta "
-             "real. ")
+             "borde de abajo. ABAJO: intervalo del 90% del COSTO DEL DÍA (comprar 1 MWh "
+             "en cada hora), calculado sumando cada escenario; el punto es la mediana y "
+             "la línea negra, el costo real. ")
     _con(CON_CALENDARIO, COLORES_CAL)
     r1 = fc.una_figura(fc.dias_anunciados_caros(), "figura_anunciados_caros_calendario.png",
                        "Días que se anunciaban caros, con calendario para todos",

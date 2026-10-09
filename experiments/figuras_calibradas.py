@@ -142,9 +142,9 @@ def una_figura(dias, nombre, titulo, nota):
         abajo.set_ylim(0.4, len(cuentas) + 0.75)
         abajo.xaxis.set_major_locator(MaxNLocator(5))
         abajo.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v / 1000:,.0f}"))
-        abajo.set_xlabel("cuenta del día, miles de pesos\n(suma de los 24 precios)")
+        abajo.set_xlabel("costo del día, miles de pesos\n(suma de los 24 precios)")
         abajo.grid(alpha=0.25, lw=0.5, axis="x")
-        abajo.set_title(f"cuenta real: {cuenta_real:,.0f}", fontsize=9)
+        abajo.set_title(f"costo real: {cuenta_real:,.0f}", fontsize=9)
     ejes[0, 0].set_ylabel("precio, pesos por MWh")
     ejes[0, 0].legend(fontsize=8, loc="upper left", framealpha=0.9)
     fig.suptitle(titulo, fontsize=12.5, y=0.995)
@@ -247,8 +247,9 @@ def main():
     comun = ("Los tres métodos con sus escenarios calibrados por nivel y bloque de horas, "
              "con lo observado en los 100 días previos. ARRIBA: banda del 90% por hora; "
              "línea gruesa, borde de arriba; punteada, borde de abajo. ABAJO: intervalo "
-             "del 90% de la CUENTA DEL DÍA, calculado sumando cada escenario; el punto es "
-             "la mediana y la línea negra, la cuenta real. ")
+             "del 90% del COSTO DEL DÍA (comprar 1 MWh en cada hora), calculado sumando "
+             "cada escenario; el punto es "
+             "la mediana y la línea negra, el costo real. ")
     dias, cumplen, total = elige_dias(20)
     r1 = una_figura(dias, "figura_picos_cubiertos_ajuste_bloques.png",
                     "Días caros, con ajuste por nivel y bloque de horas",
@@ -258,7 +259,7 @@ def main():
     r2 = una_figura(dias_normales(), "figura_dias_normales_ajuste_bloques.png",
                     "Días normales, con ajuste por nivel y bloque de horas",
                     comun + "Son los mismos días de la figura anterior: deciles 4 y 5 de la "
-                    "cuenta, donde los dos cubrían con los escenarios crudos.")
+                    "costo del día, donde los dos cubrían con los escenarios crudos.")
     r3 = una_figura(dias_anunciados_caros(), "figura_anunciados_caros_ajuste_bloques.png",
                     "Días que se anunciaban caros: el día conocido al decidir fue de los "
                     "más caros",
