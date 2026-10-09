@@ -71,7 +71,9 @@ INICIO_PROSPECTIVO = "2026-10-11"
 ## (corrida del tramo de prueba, corrida del tramo nuevo, método en cada una, nombre)
 ANALOGOS = [("calendario", "insp_calendario", "Analog-mezcla-cal7", "Analog-mezcla-cal7",
              "Analog-mezcla-cal7"),
-            ("picos_prueba", "insp_calendario", "Analog-mezcla", "Analog-mezcla-sinfiltro",
+            ## fuera del tramo de prueba run_calendario guarda el testigo sin filtro con el
+            ## nombre del método sin sufijo
+            ("picos_prueba", "insp_calendario", "Analog-mezcla", "Analog-mezcla",
              "Analog-mezcla")]
 CENTROS = [("fundacion_t0-beta", "insp_fundacion_t0-beta", "t0-beta"),
            ("fundacion_PatchTST-FM", "insp_fundacion_PatchTST-FM", "PatchTST-FM"),
