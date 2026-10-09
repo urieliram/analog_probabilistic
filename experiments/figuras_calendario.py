@@ -124,11 +124,13 @@ def dias_sorteados(cuantos=4, semilla=None, excluir=()):
     return dias
 
 
-def figura_rejilla(dias, nombre, titulo, nota):
+def figura_rejilla(dias, nombre, titulo, nota, dpi=130, ordenar=False):
     """Sólo las series por hora, en una rejilla: mediana y banda del 90% de cada método,
     y cuántas de las 24 horas cayeron dentro de la banda."""
     import numpy as np
     dias = fc.validos(dias, cuantos=16)
+    if ordenar:
+        dias = sorted(dias, key=lambda d: d[1])
     fig, ejes = plt.subplots(4, 4, figsize=(17, 14))
     horas = np.arange(1, 25)
     for eje, (zona, origen) in zip(ejes.ravel(), dias):
@@ -165,9 +167,53 @@ def figura_rejilla(dias, nombre, titulo, nota):
     fig.text(0.5, 0.005, nota, ha="center", fontsize=9, wrap=True)
     fig.tight_layout(rect=[0, 0.025, 1, 0.965])
     ruta = FIGURAS / nombre
-    fig.savefig(ruta, bbox_inches="tight", dpi=130)
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(ruta, bbox_inches="tight", dpi=dpi)
     plt.close(fig)
     return ruta
+
+
+def dias_de_zona(zona, cuantos=16, semilla=SEMILLA_REJILLA):
+    """Días al azar de una zona, con semilla fija por zona y de meses distintos.
+
+    Se sortean algunos de más, porque los primeros días del tramo pueden no tener
+    todavía historia para calibrarse."""
+    import zlib
+    import numpy as np
+    t = pd.read_parquet(RESULTS / "calendario" / f"{zona}.parquet", columns=["origin"])
+    origenes = sorted(t.origin.unique())[40:]
+    rng = np.random.default_rng([semilla, zlib.crc32(zona.encode())])
+    meses, dias = set(), []
+    for i in rng.permutation(len(origenes)):
+        origen = pd.Timestamp(origenes[i])
+        if origen.strftime("%Y-%m") in meses:
+            continue
+        meses.add(origen.strftime("%Y-%m"))
+        dias.append((zona, origen))
+        if len(dias) == cuantos + 8:
+            break
+    return dias
+
+
+def galeria_por_zona():
+    """Una rejilla de dieciséis días al azar por cada zona del panel, para el README."""
+    from experiments.protocol import load_selected_zones
+    _con(CON_CALENDARIO, COLORES_CAL)
+    rutas = []
+    for zona in load_selected_zones()["zonas"]:
+        rutas.append(figura_rejilla(
+            dias_de_zona(zona), f"galeria/{zona}.png",
+            f"{zona.replace('_', ' ').title()}: dieciséis días al azar, con calendario "
+            "para todos",
+            "Escenarios calibrados por nivel y bloque de horas con los 100 días previos. "
+            "Línea gruesa: mediana de cada método; sombra: banda del 90% por hora; línea "
+            "negra: precio observado. Arriba a la izquierda, cuántas de las 24 horas "
+            f"cayeron dentro de la banda de cada método. Semilla fija ({SEMILLA_REJILLA}) "
+            "por zona; meses distintos.", dpi=90, ordenar=True))
+        fc.calibrados.cache_clear()
+        fc._cargados.cache_clear()
+        print("escrito", rutas[-1], flush=True)
+    return rutas
 
 
 def fc_festivos():
@@ -271,4 +317,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    galeria_por_zona() if sys.argv[1:] == ["galeria"] else main()

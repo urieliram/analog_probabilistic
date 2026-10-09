@@ -49,8 +49,8 @@ COLORES = {"Analog-mezcla": "#1b5e20", "LEAR": "#ef6c00", "t0-beta (campeón)": 
 
 
 @lru_cache(maxsize=None)
-def calibrados(corrida, metodo, zona, origen, variante=VARIANTE):
-    """Los escenarios de un día, calibrados con lo observado en los 100 días previos."""
+def _cargados(corrida, metodo, zona):
+    """Escenarios por origen, en orden, y lo observado, de una zona; se lee una sola vez."""
     m = pd.read_parquet(RESULTS / f"{corrida}_members" / f"{zona}.parquet")
     m = m[m.method == metodo]
     obs = pd.read_parquet(RESULTS / corrida / f"{zona}.parquet",
@@ -59,12 +59,20 @@ def calibrados(corrida, metodo, zona, origen, variante=VARIANTE):
     observados = {o: b.sort_values("step")["observed"].to_numpy()
                   for o, b in obs.groupby("origin")}
     columnas = member_columns(m)
+    escenarios = [(o, member_matrix(b.sort_values("step"), columnas))
+                  for o, b in sorted(m.groupby("origin"), key=lambda kv: kv[0])]
+    return escenarios, observados
+
+
+@lru_cache(maxsize=None)
+def calibrados(corrida, metodo, zona, origen, variante=VARIANTE):
+    """Los escenarios de un día, calibrados con lo observado en los 100 días previos."""
+    escenarios, observados = _cargados(corrida, metodo, zona)
     H = {k: [] for k in ("obs", "med", "arr", "aba")}
-    for o, b in sorted(m.groupby("origin"), key=lambda kv: kv[0]):
+    for o, E in escenarios:
         if o > origen:
             break
         y = observados.get(o)
-        E = member_matrix(b.sort_values("step"), columnas)
         if y is None or len(y) != 24 or E.shape[1] != 24 or len(E) < 2:
             continue
         med = np.median(E, axis=0)
