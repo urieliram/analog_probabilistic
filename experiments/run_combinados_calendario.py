@@ -93,5 +93,63 @@ def main():
     print(f"escrito en {destino.with_suffix('')}")
 
 
+def analiza():
+    """H12 y H13 con los puntajes por día ya calibrados, y un diagnóstico del centro."""
+    from experiments.calibra_escenarios import DETALLE, NIVELES
+    from experiments.curva_tau import PESOS, compara
+    partes = [("_calendario", ["Analog-mezcla-cal7"]),
+              ("_err_cal", ["t0-beta+errores-cal7", "PatchTST-FM+errores-cal7"]),
+              ("_combinados_cal", ["Combinado-cal", "Centro-promedio-cal"])]
+    t = pd.concat(pd.read_parquet(str(DETALLE).replace(".parquet", f"{sufijo}.parquet"))
+                  .query("metodo in @metodos") for sufijo, metodos in partes)
+    t = t[t.variante == "nivel_bloque"].copy()
+    p = t[[f"pin_{a:.2f}" for a in NIVELES]].to_numpy()
+    for nombre, peso in PESOS.items():
+        t[f"qw_{nombre}"] = 2 * (p * peso(NIVELES)).mean(axis=1)
+    t["cubre"] = (t.costo_real >= t["cq_0.05"]) & (t.costo_real <= t["cq_0.95"])
+    print("costo del día, calibración por nivel y bloque (menos es mejor):")
+    print(t.groupby("metodo").agg(
+        zona_dias=("origen", "size"), cobertura=("cubre", "mean"),
+        toda=("qw_uniforme", "mean"), cola_alta=("qw_cola_alta", "mean"),
+        cola_baja=("qw_cola_baja", "mean")).round(3).to_string())
+    filas = []
+    for combo in ("Combinado-cal", "Centro-promedio-cal"):
+        for rival in ("t0-beta+errores-cal7", "Analog-mezcla-cal7",
+                      "PatchTST-FM+errores-cal7"):
+            for medida in ("qw_uniforme", "qw_cola_alta", "qw_cola_baja"):
+                filas.append(compara(t, combo, rival, medida))
+    r = pd.DataFrame(filas)
+    print("\ncombinación menos rival, en por ciento del rival (estadístico); negativo: "
+          "gana la combinación")
+    for (combo, rival), g in r.groupby(["a", "b"], sort=False):
+        print(f"   {combo:20s} vs {rival:26s} " + "  ".join(
+            f"{x.medida[3:]} {x.pct:+.1f} ({x.t:+.1f})" for x in g.itertuples()))
+    print("\nzona por zona, cola alta, contra t0-beta+errores-cal7:")
+    for combo in ("Combinado-cal", "Centro-promedio-cal"):
+        z = [compara(t[t.zona == zona], combo, "t0-beta+errores-cal7", "qw_cola_alta")
+             for zona in sorted(t.zona.unique())]
+        print(f"   {combo:20s} gana en {sum(x['pct'] < 0 for x in z)} de {len(z)}; "
+              f"con estadístico menor que -1.96 en {sum(x['t'] < -1.96 for x in z)}, "
+              f"mayor que 1.96 en {sum(x['t'] > 1.96 for x in z)}")
+    r.round(4).to_csv(RESULTS / "publicacion" / "cuadro_combinados_calendario.csv",
+                      index=False)
+    ## diagnóstico, no declarado: error absoluto medio del centro promediado
+    def medianas(corrida, metodo):
+        partes = []
+        for f in sorted((RESULTS / corrida).glob("*.parquet")):
+            m = pd.read_parquet(f, columns=["zone", "origin", "method", "step", "q0.5",
+                                            "observed"])
+            partes.append(m[m.method == metodo])
+        return pd.concat(partes).set_index(["zone", "origin", "step"])
+    a = medianas("calendario", "Analog-mezcla-cal7")
+    b = medianas("fundacion_t0-beta", "t0-beta")
+    comun = a.index.intersection(b.index)
+    ya, yb, y = a.loc[comun]["q0.5"], b.loc[comun]["q0.5"], b.loc[comun]["observed"]
+    print(f"\ndiagnóstico del centro, {len(comun):,d} horas: análogo con calendario "
+          f"{(ya - y).abs().mean():.1f}, t0-beta {(yb - y).abs().mean():.1f}, promedio de "
+          f"los dos {((ya + yb) / 2 - y).abs().mean():.1f}; correlación de sus errores "
+          f"{np.corrcoef(ya - y, yb - y)[0, 1]:.2f}")
+
+
 if __name__ == "__main__":
-    main()
+    analiza() if sys.argv[1:] == ["analiza"] else main()
