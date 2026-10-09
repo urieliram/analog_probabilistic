@@ -8,7 +8,8 @@ the-art algorithms, best practices and an open-access benchmark*, Applied Energy
 regresión lineal sobre los precios de los días -1, -2, -3 y -7 a todas sus horas, más
 el día de la semana, y deja que un **lazo** —una penalización que empuja a cero los
 coeficientes que no ganan su lugar— decida cuáles de esas 103 variables se quedan. Se
-reajusta cada día, igual que en operación.
+reajusta cada ``refit_dias`` días y entre reajustes reusa sus coeficientes; en el
+artículo, cada semana (``run_bench.py --refit 7``).
 
 Tres decisiones que hay que declarar, porque cambian lo que significa el resultado:
 
