@@ -216,8 +216,7 @@ def figura_por_hora():
                               v == "nivel_bloque" else 1.5, label=nombre)
         ejes[1, col].axhline(0.90, color="black", lw=1)
         ejes[1, col].text(1, 0.903, "lo prometido: 0.90", fontsize=8)
-        titulo = "t0-beta con escenarios de sus errores (campeón)" \
-            if col == 0 else "Analog-mezcla"
+        titulo = "t0-beta con escenarios de sus errores" if col == 0 else "Analog-mix"
         ejes[0, col].set_title(titulo, fontsize=11)
         ejes[1, col].set_xlabel("hora del día")
         for e in ejes[:, col]:

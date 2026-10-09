@@ -43,18 +43,24 @@ from experiments.run_calendario import tipo_de_dia  # noqa: E402
 
 FIGURAS = RESULTS.parent / "figuras"
 
+## el campeón es la combinación que promedia los centros de t0-beta y del análogo, los
+## dos con calendario (experiments/run_combinados_calendario.py, hipótesis H13)
+CAMPEON = ("combinados_cal", "Centro-promedio-cal")
 CON_CALENDARIO = {
     "Analog-mix con calendario": ("calendario", "Analog-mezcla-cal7"),
     "LEAR": ("lear_prueba", "LEAR"),
-    "t0-beta con calendario (campeón)": ("err_cal", "t0-beta+errores-cal7"),
+    "t0-beta con calendario": ("err_cal", "t0-beta+errores-cal7"),
+    "t0-beta + análogo (campeón)": CAMPEON,
 }
 COLORES_CAL = {"Analog-mix con calendario": "#1b5e20", "LEAR": "#ef6c00",
-               "t0-beta con calendario (campeón)": "#5e35b1",
+               "t0-beta con calendario": "#5e35b1",
+               "t0-beta + análogo (campeón)": "#d81b60",
                "Analog-mix sin calendario": "#9e9e9e"}
 DOMINGOS = {
     "Analog-mix sin calendario": ("picos_prueba", "Analog-mezcla"),
     "Analog-mix con calendario": ("calendario", "Analog-mezcla-cal7"),
-    "t0-beta con calendario (campeón)": ("err_cal", "t0-beta+errores-cal7"),
+    "t0-beta con calendario": ("err_cal", "t0-beta+errores-cal7"),
+    "t0-beta + análogo (campeón)": CAMPEON,
 }
 ## zonas de regiones distintas, fijadas antes de mirar ningún resultado de estos días
 ZONAS_DOMINGO = ["merida", "centro_sur", "chihuahua", "culiacan"]
@@ -126,7 +132,7 @@ def figura_por_hora():
                "nivel_bloque": ("por nivel y bloque de horas", "#5e35b1", "-")}
     fig, ejes = plt.subplots(2, 2, figsize=(13, 7.5), sharex=True)
     for col, (metodo, titulo) in enumerate([
-            ("t0-beta+errores-cal7", "t0-beta, errores con calendario (campeón)"),
+            ("t0-beta+errores-cal7", "t0-beta, errores con calendario"),
             ("Analog-mezcla-cal7", "Analog-mix con calendario")]):
         a = h.loc[metodo]
         for v, (nombre, color, ls) in estilos.items():

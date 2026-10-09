@@ -37,6 +37,7 @@ from experiments.protocol import RESULTS  # noqa: E402
 FIGURAS = RESULTS.parent / "figuras"
 PUBLICACION = RESULTS / "publicacion"
 VERDE = "#1b5e20"
+MAGENTA = "#d81b60"
 SIN_CALENDARIO = [("LEAR", "LEAR"), ("t0-beta+errores", "t0-beta, de sus errores"),
                   ("PatchTST-FM+errores", "PatchTST-FM, de sus errores")]
 CON_CALENDARIO = [("LEAR", "LEAR"),
@@ -68,10 +69,13 @@ def curva(t, principal, rivales):
 def curvas():
     c1 = curva(por_dia([("", ["Analog-mezcla"] + [r for r, _ in SIN_CALENDARIO])]),
                "Analog-mezcla", SIN_CALENDARIO)
-    c2 = curva(por_dia([("", ["LEAR"]), ("_calendario", ["Analog-mezcla-cal7"]),
-                        ("_err_cal", [r for r, _ in CON_CALENDARIO[1:]])]),
-               "Analog-mezcla-cal7", CON_CALENDARIO)
-    return c1, c2
+    con = por_dia([("", ["LEAR"]), ("_calendario", ["Analog-mezcla-cal7"]),
+                   ("_err_cal", [r for r, _ in CON_CALENDARIO[1:]]),
+                   ("_combinados_cal", ["Centro-promedio-cal"])])
+    c2 = curva(con, "Analog-mezcla-cal7", CON_CALENDARIO)
+    ## el campeón: la combinación que promedia los centros de t0-beta y del análogo
+    c3 = curva(con, "Centro-promedio-cal", CON_CALENDARIO)
+    return c1, c2, c3
 
 
 def error_del_centro():
@@ -101,18 +105,22 @@ def error_del_centro():
     return tab, len(comun)
 
 
-def figura_curva(c, rivales, principal, titulo, nombre):
+def figura_curva(series, rivales, sujeto, titulo, nombre):
+    """Una curva por cada (cuadro, etiqueta, color) de ``series``, contra cada rival."""
     fig, ejes = plt.subplots(1, len(rivales), figsize=(13, 4.2), sharey=True)
     for eje, (rival, etiqueta) in zip(ejes, rivales):
-        g = c[c.b == rival].sort_values("tau")
-        eje.plot(g.tau, g.pct, "o-", ms=3, color=VERDE)
-        eje.fill_between(g.tau, g.pct_bajo, g.pct_alto, color=VERDE, alpha=0.15)
+        for c, nombre_serie, color in series:
+            g = c[c.b == rival].sort_values("tau")
+            eje.plot(g.tau, g.pct, "o-", ms=3, color=color, label=nombre_serie)
+            eje.fill_between(g.tau, g.pct_bajo, g.pct_alto, color=color, alpha=0.15)
         eje.axhline(0, color="black", lw=0.8)
         eje.set_title(f"contra {etiqueta}", fontsize=10.5)
         eje.set_xlabel("τ (parte de la distribución del costo del día)")
         eje.grid(alpha=0.3)
-    ejes[0].set_ylabel(f"{principal} menos rival,\n% del rival (abajo de cero gana el "
-                       "análogo)")
+    ejes[0].set_ylabel(f"{sujeto} menos rival,\n% del rival (abajo de cero gana el "
+                       f"{'análogo' if len(series) == 1 else 'método'})")
+    if len(series) > 1:
+        ejes[0].legend(fontsize=8.5, loc="lower left")
     fig.suptitle(titulo, fontsize=11)
     fig.tight_layout()
     ruta = FIGURAS / nombre
@@ -146,19 +154,22 @@ def figura_calendario(tab):
 
 
 def main():
-    c1, c2 = curvas()
+    c1, c2, c3 = curvas()
     c1.round(4).to_csv(PUBLICACION / "cuadro_curva_tau_calibrada.csv", index=False)
     c2.round(4).to_csv(PUBLICACION / "cuadro_curva_tau_calendario.csv", index=False)
+    c3.round(4).to_csv(PUBLICACION / "cuadro_curva_tau_campeon.csv", index=False)
     tab, horas = error_del_centro()
     tab.round(1).to_csv(PUBLICACION / "cuadro_error_centro_por_dia.csv",
                         index_label="dia")
     print(f"error del centro sobre {horas:,d} horas comunes:")
     print(tab.round(1).to_string())
     for ruta in (
-            figura_curva(c1, SIN_CALENDARIO, "Analog-mix",
+            figura_curva([(c1, "Analog-mix", VERDE)], SIN_CALENDARIO, "Analog-mix",
                          "Escenarios calibrados por nivel y bloque de horas, todos los "
                          "métodos igual", "figura_curva_tau_calibrada.png"),
-            figura_curva(c2, CON_CALENDARIO, "Analog-mix con calendario",
+            figura_curva([(c2, "Analog-mix con calendario", VERDE),
+                          (c3, "t0-beta + análogo (campeón)", MAGENTA)],
+                         CON_CALENDARIO, "Método",
                          "Todos calibrados por nivel y bloque de horas, y con la misma "
                          "información de calendario", "figura_curva_tau_calendario.png"),
             figura_calendario(tab)):
