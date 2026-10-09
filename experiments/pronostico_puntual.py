@@ -120,5 +120,35 @@ def main():
                             index=False)
 
 
+def mediana_del_costo():
+    """Error absoluto de la mediana de la distribución del costo del día.
+
+    Es el pronóstico puntual que corresponde al error absoluto: la mediana del costo
+    del día calculada con los escenarios calibrados por nivel y bloque, no la suma de
+    las medianas de cada hora. La pinball en 0.5 es la mitad de ese error.
+    """
+    from experiments.calibra_escenarios import DETALLE
+    from experiments.curva_tau import compara
+    partes = [("_calendario", ["Analog-mezcla-cal7"]),
+              ("_err_cal", ["t0-beta+errores-cal7", "PatchTST-FM+errores-cal7"]),
+              ("", ["LEAR"]), ("_combinados_cal", ["Centro-promedio-cal"])]
+    t = pd.concat(pd.read_parquet(str(DETALLE).replace(".parquet", f"{sufijo}.parquet"))
+                  .query("metodo in @metodos") for sufijo, metodos in partes)
+    t = t[t.variante == "nivel_bloque"].copy()
+    t["error_mediana"] = 2 * t["pin_0.50"]
+    comun = set.intersection(*[set(zip(g.zona, g.origen)) for _, g in t.groupby("metodo")])
+    t = t[[(z, o) in comun for z, o in zip(t.zona, t.origen)]]
+    tabla = t.groupby("metodo").error_mediana.mean()
+    print(f"{len(comun):,d} días-zona comunes; error absoluto de la mediana del costo:")
+    print(tabla.round(1).to_string())
+    pruebas = pd.DataFrame([compara(t, a, b, "error_mediana") for a, b in [
+        ("Centro-promedio-cal", "t0-beta+errores-cal7"),
+        ("Analog-mezcla-cal7", "t0-beta+errores-cal7"), ("Analog-mezcla-cal7", "LEAR")]])
+    print(pruebas[["a", "b", "pct", "t"]].round(2).to_string(index=False))
+    tabla.round(2).to_csv(RESULTS / "publicacion" / "cuadro_mediana_costo_dia.csv")
+    pruebas.round(4).to_csv(RESULTS / "publicacion" / "cuadro_mediana_costo_dia_pruebas.csv",
+                            index=False)
+
+
 if __name__ == "__main__":
-    main()
+    mediana_del_costo() if sys.argv[1:] == ["mediana"] else main()
