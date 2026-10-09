@@ -34,7 +34,8 @@ from experiments.benchmarks.lear import LEARRodante  # noqa: E402
 from experiments.benchmarks.naive import (naive, naive_combinado,  # noqa: E402
                                           naive_semanal)
 from experiments.forecast_store import ForecastStore  # noqa: E402
-from experiments.protocol import (HORIZON, RESULTS, SEARCH_YEARS,  # noqa: E402
+from experiments.protocol import (HORIZON, INSPECTED_END,  # noqa: E402
+                                  INSPECTED_START, RESULTS, SEARCH_YEARS,
                                   SELECTION_END, SELECTION_START, TEST_END,
                                   TEST_START, build_origins,
                                   load_selected_zones)
@@ -42,7 +43,9 @@ from experiments.scores import LEVELS  # noqa: E402
 from experiments.series import load_series  # noqa: E402
 
 TRAMOS = {"seleccion": (SELECTION_START, SELECTION_END),
-          "prueba": (TEST_START, TEST_END)}
+          "prueba": (TEST_START, TEST_END),
+          ## posterior a la prueba; una versión anterior del experimento ya corrió aquí
+          "inspeccionado": (INSPECTED_START, INSPECTED_END)}
 
 ## Los que sólo necesitan la historia y devuelven trayectorias de una vez.
 SIN_ESTADO = {

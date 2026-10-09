@@ -65,6 +65,9 @@ def main() -> None:
     p.add_argument("--origenes", type=int, default=None,
                    help="limita los orígenes, para pruebas rápidas")
     p.add_argument("--dispositivo", default="cuda")
+    p.add_argument("--inicio", default=TEST_START)
+    p.add_argument("--fin", default=TEST_END)
+    p.add_argument("--salida", default=None)
     args = p.parse_args()
 
     modulo = dict(ADAPTADORES)[args.modelo]
@@ -73,8 +76,8 @@ def main() -> None:
     faltantes = sorted(set(np.round(LEVELS, 4)) - nativos)
 
     zonas = load_selected_zones()["zonas"][: args.zonas]
-    destino = RESULTS / f"fundacion_{args.modelo}.parquet"
-    print(f"{args.modelo}: {len(zonas)} zonas, tramo {TEST_START} a {TEST_END}")
+    destino = Path(args.salida or RESULTS / f"fundacion_{args.modelo}.parquet")
+    print(f"{args.modelo}: {len(zonas)} zonas, tramo {args.inicio} a {args.fin}")
     print(f"  niveles nativos: {len(nativos)}; de los {len(LEVELS)} del banco "
           f"faltan {len(faltantes)}: {faltantes}")
     print(f"  cargando en {args.dispositivo}...", flush=True)
@@ -90,7 +93,7 @@ def main() -> None:
             print(f"  {numero}/{len(zonas)} {zona:20s} (ya estaba)", flush=True)
             continue
         serie = load_series("pml", zona)
-        origenes = build_origins(TEST_START, TEST_END, serie)
+        origenes = build_origins(args.inicio, args.fin, serie)
         if args.origenes:
             origenes = origenes[: args.origenes]
         fallos, primer_error = 0, None
