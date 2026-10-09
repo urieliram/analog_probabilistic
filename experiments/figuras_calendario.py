@@ -95,24 +95,79 @@ def festivos_elegidos():
     return [(z, pd.Timestamp(f) - pd.Timedelta(hours=1)) for z, f in FESTIVOS_ELEGIDOS]
 
 
-def dias_sorteados(cuantos=4):
-    """Días al azar del tramo de prueba, con semilla fija, de zonas y meses distintos."""
+SEMILLA_REJILLA = 20261009
+
+
+def dias_sorteados(cuantos=4, semilla=None, excluir=()):
+    """Días al azar del tramo de prueba, con semilla fija, de zonas y meses distintos.
+
+    Con 25 zonas, si se piden más días que zonas se permite repetir zona, pero nunca mes.
+    """
     import numpy as np
     from experiments.protocol import load_selected_zones
     zonas = load_selected_zones()["zonas"]
     t = pd.read_parquet(RESULTS / "calendario" / f"{zonas[0]}.parquet", columns=["origin"])
     origenes = sorted(t.origin.unique())[40:]
-    rng = np.random.default_rng(SEMILLA_SORTEO)
-    vistos, dias = set(), []
+    rng = np.random.default_rng(SEMILLA_SORTEO if semilla is None else semilla)
+    zonas_vistas, meses_vistos, dias = set(), set(), []
+    excluir = {(z, pd.Timestamp(o)) for z, o in excluir}
     while len(dias) < cuantos:
         zona = zonas[rng.integers(len(zonas))]
         origen = pd.Timestamp(origenes[rng.integers(len(origenes))])
         mes = origen.strftime("%Y-%m")
-        if zona in vistos or mes in vistos:
+        if mes in meses_vistos or (zona in zonas_vistas and cuantos <= len(zonas)) \
+                or (zona, origen) in excluir:
             continue
-        vistos.update({zona, mes})
+        zonas_vistas.add(zona)
+        meses_vistos.add(mes)
         dias.append((zona, origen))
     return dias
+
+
+def figura_rejilla(dias, nombre, titulo, nota):
+    """Sólo las series por hora, en una rejilla: mediana y banda del 90% de cada método,
+    y cuántas de las 24 horas cayeron dentro de la banda."""
+    import numpy as np
+    dias = fc.validos(dias, cuantos=16)
+    fig, ejes = plt.subplots(4, 4, figsize=(17, 14))
+    horas = np.arange(1, 25)
+    for eje, (zona, origen) in zip(ejes.ravel(), dias):
+        real, textos = None, []
+        for etiqueta, (corrida, metodo) in fc.FUENTES.items():
+            d = fc.calibrados(corrida, metodo, zona, origen)
+            if d is None:
+                continue
+            E, real = d["escenarios"], d["real"]
+            q05, q50, q95 = np.quantile(E, [0.05, 0.5, 0.95], axis=0)
+            color = fc.COLORES[etiqueta]
+            eje.fill_between(horas, q05, q95, color=color, alpha=0.10, linewidth=0)
+            eje.plot(horas, q95, color=color, lw=0.6)
+            eje.plot(horas, q50, color=color, lw=1.8, label=etiqueta)
+            dentro = int(((real >= q05) & (real <= q95)).sum())
+            textos.append((f"{dentro}/24", color))
+        eje.plot(horas, real, color="black", lw=2.2, label="precio observado")
+        dia = (pd.Timestamp(origen) + pd.Timedelta(days=1))
+        eje.set_title(f"{zona.replace('_', ' ')} · {dia.date()} ({dia.day_name()[:3]})",
+                      fontsize=9.5)
+        eje.grid(alpha=0.25, lw=0.5)
+        eje.tick_params(labelsize=8)
+        for i, (texto, color) in enumerate(textos):
+            eje.text(0.02 + 0.13 * i, 0.97, texto, transform=eje.transAxes, fontsize=8,
+                     color=color, va="top", fontweight="bold")
+    for eje in ejes[-1]:
+        eje.set_xlabel("hora del día", fontsize=9)
+    for eje in ejes[:, 0]:
+        eje.set_ylabel("pesos por MWh", fontsize=9)
+    manejadores, etiquetas = ejes[0, 0].get_legend_handles_labels()
+    fig.legend(manejadores, etiquetas, loc="upper center", ncol=5, fontsize=10,
+               bbox_to_anchor=(0.5, 0.985))
+    fig.suptitle(titulo, fontsize=13, y=1.0)
+    fig.text(0.5, 0.005, nota, ha="center", fontsize=9, wrap=True)
+    fig.tight_layout(rect=[0, 0.025, 1, 0.965])
+    ruta = FIGURAS / nombre
+    fig.savefig(ruta, bbox_inches="tight", dpi=130)
+    plt.close(fig)
+    return ruta
 
 
 def fc_festivos():
@@ -199,8 +254,19 @@ def main():
                        "Cuatro días cualquiera, sorteados, con calendario para todos",
                        comun + f"Días sorteados del tramo de prueba con semilla fija "
                        f"({SEMILLA_SORTEO}), de zonas y meses distintos.")
+    fc.calibrados.cache_clear()
+    _con(CON_CALENDARIO, COLORES_CAL)
+    r6 = figura_rejilla(
+        dias_sorteados(24, semilla=SEMILLA_REJILLA, excluir=dias_sorteados()),
+        "figura_rejilla_dias_sorteados.png",
+        "Dieciséis días cualquiera, sorteados, con calendario para todos",
+        "Escenarios calibrados por nivel y bloque de horas con los 100 días previos. Línea "
+        "gruesa: mediana de cada método; sombra: banda del 90% por hora; línea negra: "
+        "precio observado. Arriba a la izquierda, cuántas de las 24 horas cayeron dentro "
+        f"de la banda de cada método. Días sorteados con semilla fija ({SEMILLA_REJILLA}), "
+        "de meses distintos, distintos de los de la galería de cuatro días.")
     r3 = figura_por_hora()
-    for r in (r1, r2, r3, r4, r5):
+    for r in (r1, r2, r3, r4, r5, r6):
         print("escrito", r)
 
 
