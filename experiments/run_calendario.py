@@ -79,7 +79,7 @@ def tipo_de_dia(indice: pd.DatetimeIndex) -> tuple:
 
 
 def una_zona(tarea: tuple) -> dict:
-    zona, config, destino, limite = tarea
+    zona, config, destino, limite, inicio, fin = tarea
     comienzo = time.time()
     salida = Path(destino)
     if (salida.with_suffix("") / f"{zona}.parquet").exists():
@@ -87,7 +87,7 @@ def una_zona(tarea: tuple) -> dict:
     serie = load_series("pml", zona)
     almacen = ForecastStore(LEVELS, salida)
     k, sep, gamma = int(config["k"]), float(config["separation"]), float(config["gamma"])
-    origenes = build_origins(TEST_START, TEST_END, serie)
+    origenes = build_origins(inicio, fin, serie)
     if limite:
         origenes = origenes[:limite]
     for origen in origenes:
@@ -105,6 +105,9 @@ def una_zona(tarea: tuple) -> dict:
         tipos = {"cal3": (tres_s, tres_o[0], False), "cal7": (siete_s, siete_o[0], False),
                  "fase": (np.zeros(len(indice), dtype=int), 0, True),
                  "cal7fase": (siete_s, siete_o[0], True)}
+        if inicio != TEST_START:
+            ## fuera del tramo de prueba hace falta también el testigo sin filtro
+            tipos["sinfiltro"] = (np.zeros(len(indice), dtype=int), 0, False)
         reloj = time.time()
         for sufijo, (vector, tipo_objetivo, alineado) in tipos.items():
             partes = []
@@ -126,12 +129,12 @@ def una_zona(tarea: tuple) -> dict:
                                        recorte)
                 partes.append(miembros)
                 if w == int(config["window"]) and len(miembros) >= 2:
-                    almacen.add(zona, origen, f"Analog-{sufijo}",
+                    almacen.add(zona, origen, f"Analog-{sufijo}".replace("-sinfiltro", ""),
                                 ensemble_quantiles(miembros, LEVELS), observado,
                                 miembros, time.time() - reloj)
             if partes:
                 mezcla = np.vstack(partes)
-                almacen.add(zona, origen, f"Analog-mezcla-{sufijo}",
+                almacen.add(zona, origen, f"Analog-mezcla-{sufijo}".replace("-sinfiltro", ""),
                             ensemble_quantiles(mezcla, LEVELS), observado, mezcla,
                             time.time() - reloj)
     parte = almacen.flush(zona)
@@ -145,6 +148,8 @@ def main() -> None:
     p.add_argument("--zonas", type=int, default=None)
     p.add_argument("--origenes", type=int, default=None)
     p.add_argument("--salida", default=None)
+    p.add_argument("--inicio", default=TEST_START)
+    p.add_argument("--fin", default=TEST_END)
     args = p.parse_args()
     config = load_selected()
     zonas = load_selected_zones()["zonas"][: args.zonas]
@@ -152,7 +157,7 @@ def main() -> None:
     print(f"análogo con filtro de calendario: {len(zonas)} zonas, {args.procesos} procesos",
           flush=True)
     comienzo = time.time()
-    tareas = [(z, config, str(destino), args.origenes) for z in zonas]
+    tareas = [(z, config, str(destino), args.origenes, args.inicio, args.fin) for z in zonas]
     with Pool(args.procesos) as piscina:
         for n, h in enumerate(piscina.imap_unordered(una_zona, tareas), 1):
             print(f"  {n}/{len(zonas)} {h['zona']:22s} {h['segundos']:6.0f}s  "

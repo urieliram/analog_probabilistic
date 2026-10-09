@@ -100,7 +100,7 @@ POR_NIVEL = RESULTS / "calibrados_por_nivel.csv"
 CORRIDAS = {
     "picos_prueba": None, "forecasts_prueba": ["Analog-minimos-cuadrados"],
     "memoria_larga": None, "euclidiana": None, "ventanas": None, "combinados": None,
-    "calendario": None, "centros": None,
+    "calendario": None, "centros": None, "err_cal": None,
     "bench_prueba": None, "lear_prueba": None, "fundacion_Moirai": None,
     "err_picos": None, "err_lear": None, "err_t0-beta": None,
     "err_PatchTST-FM": None, "err_TiRex": None, "err_TimesFM-2.5": None,
