@@ -48,12 +48,12 @@ K_GRID = (10, 20, 40, 100)
 SEPARATION_GRID = (0.5, 1.0)
 
 ## HEREDADOS, NO ELEGIDOS. Estos tres valores vienen del experimento anterior y el
-## barrido de este rediseño los dejó fijos: sólo recorrió gamma. Es decir que la
-## malla de arriba está declarada pero no se ha corrido, y la ventana de 48 horas no
-## tiene detrás ninguna comparación contra 24, 72 o 168 sobre estos datos. Mientras
-## eso siga así, estos valores se leen de aquí y no se escriben a mano en los
-## módulos, para que el hueco se vea en el protocolo en vez de esconderse en un
-## script de barrido.
+## barrido de este rediseño los dejó fijos: sólo recorrió gamma. La malla de arriba
+## se corrió después, en `grid_sweep.py`, para comprobar y no para elegir: sobre el
+## tramo de selección 282 de sus 352 celdas quedan dentro de un error estándar de la
+## mejor, y la heredada es una de ellas, así que la malla no la distingue. Estos
+## valores se leen de aquí y no se escriben a mano en los módulos, para que su origen
+## se vea en el protocolo en vez de esconderse en un script de barrido.
 INHERITED_WINDOW = 48
 INHERITED_K = 40
 INHERITED_SEPARATION = 0.5

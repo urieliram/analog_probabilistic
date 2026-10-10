@@ -77,8 +77,8 @@ def linea_de_tiempo(eje):
     debajo = 1.55
     eje.text((h0 + h1) / 2, debajo, "sólo historia\npara buscar análogos",
              ha="center", va="top", fontsize=8.6, color="#616161", linespacing=1.3)
-    eje.text((s0 + s1) / 2, debajo, "validación: se eligió\nla configuración\n"
-             "del análogo\n(valle de precios\nde la pandemia)", ha="center", va="top",
+    eje.text((s0 + s1) / 2, debajo, "validación: se eligió γ\ny se probó la malla\n"
+             "(valle de precios\nde la pandemia)", ha="center", va="top",
              fontsize=8.6, color=NARANJA, linespacing=1.3)
     ## las zonas se eligieron con la historia y la selección juntas
     eje.plot([h0, h0, s1, s1], [0.86, 0.8, 0.8, 0.86], color="#616161", lw=1)
