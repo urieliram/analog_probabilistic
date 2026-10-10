@@ -100,12 +100,13 @@ DICCIONARIO = [
      "entregada sobre todos los niveles. Menos es mejor"),
     ("hit_0.05 … hit_0.95", "fracción de 0 a 1", "veces que el precio quedó POR DEBAJO de "
      "ese cuantil; si el método está calibrado, hit_a debería valer a"),
-    ("costo_real", "pesos", "la cuenta del día: suma de los 24 precios por el perfil de "
-     "carga, que aquí es plano, una unidad por hora"),
-    ("faltante", "pesos", "cuánto se quedó CORTO el techo anunciado respecto de la cuenta "
-     "real; cero si la cuenta cayó dentro. Es el dinero no presupuestado"),
-    ("dentro_90", "sí o no", "la cuenta real cayó dentro del intervalo de 90% de la cuenta"),
-    ("decil", "entero 1 a 10", "decil de la cuenta REAL del día, con cortes comunes a "
+    ("costo_real", "pesos", "el costo del día: suma de los 24 precios, lo que paga un "
+     "comprador por una unidad en cada hora"),
+    ("faltante", "pesos", "cuánto se quedó CORTO el techo anunciado respecto del costo "
+     "real; cero si el costo cayó dentro. Es el dinero no presupuestado"),
+    ("dentro_90", "sí o no", "el costo real cayó dentro del intervalo de 90% del costo "
+     "del día"),
+    ("decil", "entero 1 a 10", "decil del costo REAL del día, con cortes comunes a "
      "todos los métodos; el 10 son los días más caros"),
     ("corr_por_camino", "correlación", "cuánto persiste de una hora a la siguiente lo que "
      "aparta a cada escenario del promedio del ensamble. Alto = cada escenario es un día "
@@ -206,7 +207,7 @@ def main() -> None:
                             puntajes.groupby(["modelo", "escenarios", "zone"])
                             [columnas].mean()))
 
-    ## ---- la cuenta del día, si ya se midió ----
+    ## ---- el costo del día, si ya se midió ----
     por_dia = RESULTS / "costo_diario_por_dia.parquet"
     if por_dia.exists():
         d = pd.read_parquet(por_dia)
@@ -278,7 +279,7 @@ def main() -> None:
         "| `falta_pesos` | menos es mejor |",
         "| `corr_por_camino` | más es mejor |",
         "",
-        "La cobertura prometida es 0.80 en el intervalo común y 0.90 en el de la cuenta",
+        "La cobertura prometida es 0.80 en el intervalo común y 0.90 en el del costo",
         "del día. Un método que cubre 0.93 no es mejor que uno que cubre 0.80: está mal",
         "calibrado del lado caro, porque paga filo por una seguridad que no prometió.",
         "",

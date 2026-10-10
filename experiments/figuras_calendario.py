@@ -291,13 +291,13 @@ def figura_por_hora():
 def main():
     comun = t("Escenarios calibrados por nivel y bloque de horas con los 100 días previos. "
               "ARRIBA: mediana en línea gruesa y banda del 90% por hora (delgada, borde de "
-              "arriba; punteada, borde de abajo). ABAJO: intervalo del 90% del COSTO DEL DÍA (comprar 1 MWh "
-              "en cada hora), calculado sumando cada escenario; el punto es la mediana y "
+              "arriba; punteada, borde de abajo). ABAJO: intervalo del 90% del COSTO DEL DÍA (suma de los 24 precios, "
+              "una unidad en cada hora), calculado sumando cada escenario; el punto es la mediana y "
               "la línea negra, el costo real. ",
               "Scenarios calibrated by level and hour block with the previous 100 days. "
               "TOP: median in a thick line and hourly 90% band (thin line, upper edge; "
-              "dotted line, lower edge). BOTTOM: 90% interval of the DAILY COST (buying "
-              "1 MWh in each hour), computed by summing each scenario; the dot is the "
+              "dotted line, lower edge). BOTTOM: 90% interval of the DAILY COST (sum of the 24 prices, "
+              "one unit in each hour), computed by summing each scenario; the dot is the "
               "median and the black line, the actual cost. ")
     _con(CON_CALENDARIO, COLORES_CAL)
     r1 = fc.una_figura(fc.dias_anunciados_caros(), "figura_anunciados_caros_calendario.png",

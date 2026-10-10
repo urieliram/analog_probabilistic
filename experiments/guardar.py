@@ -16,12 +16,18 @@ Ghostscript comprime el EPS al final; sin eso, la parte que va como imagen lo ha
 pesar decenas de megas. El PNG se escribe primero y sin tocar nada, de modo que sale
 idéntico al de antes.
 """
+import os
+
 import matplotlib
 from matplotlib.colors import to_rgb
 from matplotlib.legend import Legend
 from matplotlib.text import Text
 
 PUNTOS_EPS = 300
+
+## matplotlib escribe la hora dentro del EPS, y con eso dos corridas iguales dan
+## archivos distintos; con esta variable fija la fecha y el archivo sale idéntico
+os.environ.setdefault("SOURCE_DATE_EPOCH", "0")
 
 
 def _translucidas(eje):
