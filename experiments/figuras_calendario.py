@@ -38,29 +38,36 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import experiments.figuras_calibradas as fc  # noqa: E402
+from experiments.idioma import carpeta, t  # noqa: E402
 from experiments.protocol import RESULTS  # noqa: E402
 from experiments.run_calendario import tipo_de_dia  # noqa: E402
 
-FIGURAS = RESULTS.parent / "figuras"
+FIGURAS = carpeta(RESULTS.parent / "figuras")
 
 ## el campeón es la combinación que promedia los centros de t0-beta y del análogo, los
 ## dos con calendario (experiments/run_combinados_calendario.py, hipótesis H13)
 CAMPEON = ("combinados_cal", "Centro-promedio-cal")
 CON_CALENDARIO = {
-    "Analog-mix con calendario": ("calendario", "Analog-mezcla-cal7"),
+    t("Analog-mix con calendario", "Analog-mix with calendar"):
+        ("calendario", "Analog-mezcla-cal7"),
     "LEAR": ("lear_prueba", "LEAR"),
-    "t0-beta con calendario": ("err_cal", "t0-beta+errores-cal7"),
-    "t0-beta + análogo (campeón)": CAMPEON,
+    t("t0-beta con calendario", "t0-beta with calendar"):
+        ("err_cal", "t0-beta+errores-cal7"),
+    t("t0-beta + análogo (campeón)", "t0-beta + analog (champion)"): CAMPEON,
 }
-COLORES_CAL = {"Analog-mix con calendario": "#1b5e20", "LEAR": "#ef6c00",
-               "t0-beta con calendario": "#5e35b1",
-               "t0-beta + análogo (campeón)": "#d81b60",
-               "Analog-mix sin calendario": "#9e9e9e"}
+COLORES_CAL = {t("Analog-mix con calendario", "Analog-mix with calendar"): "#1b5e20",
+               "LEAR": "#ef6c00",
+               t("t0-beta con calendario", "t0-beta with calendar"): "#5e35b1",
+               t("t0-beta + análogo (campeón)", "t0-beta + analog (champion)"): "#d81b60",
+               t("Analog-mix sin calendario", "Analog-mix without calendar"): "#9e9e9e"}
 DOMINGOS = {
-    "Analog-mix sin calendario": ("picos_prueba", "Analog-mezcla"),
-    "Analog-mix con calendario": ("calendario", "Analog-mezcla-cal7"),
-    "t0-beta con calendario": ("err_cal", "t0-beta+errores-cal7"),
-    "t0-beta + análogo (campeón)": CAMPEON,
+    t("Analog-mix sin calendario", "Analog-mix without calendar"):
+        ("picos_prueba", "Analog-mezcla"),
+    t("Analog-mix con calendario", "Analog-mix with calendar"):
+        ("calendario", "Analog-mezcla-cal7"),
+    t("t0-beta con calendario", "t0-beta with calendar"):
+        ("err_cal", "t0-beta+errores-cal7"),
+    t("t0-beta + análogo (campeón)", "t0-beta + analog (champion)"): CAMPEON,
 }
 ## zonas de regiones distintas, fijadas antes de mirar ningún resultado de estos días
 ZONAS_DOMINGO = ["merida", "centro_sur", "chihuahua", "culiacan"]
@@ -147,7 +154,8 @@ def figura_rejilla(dias, nombre, titulo, nota, dpi=130, ordenar=False):
             eje.plot(horas, q50, color=color, lw=1.8, label=etiqueta)
             dentro = int(((real >= q05) & (real <= q95)).sum())
             textos.append((f"{dentro}/24", color))
-        eje.plot(horas, real, color="black", lw=2.2, label="precio observado")
+        eje.plot(horas, real, color="black", lw=2.2,
+                 label=t("precio observado", "observed price"))
         dia = (pd.Timestamp(origen) + pd.Timedelta(days=1))
         eje.set_title(f"{zona.replace('_', ' ')} · {dia.date()} ({dia.day_name()[:3]})",
                       fontsize=9.5)
@@ -157,9 +165,9 @@ def figura_rejilla(dias, nombre, titulo, nota, dpi=130, ordenar=False):
             eje.text(0.02 + 0.13 * i, 0.97, texto, transform=eje.transAxes, fontsize=8,
                      color=color, va="top", fontweight="bold")
     for eje in ejes[-1]:
-        eje.set_xlabel("hora del día", fontsize=9)
+        eje.set_xlabel(t("hora del día", "hour of the day"), fontsize=9)
     for eje in ejes[:, 0]:
-        eje.set_ylabel("pesos por MWh", fontsize=9)
+        eje.set_ylabel(t("pesos por MWh", "pesos per MWh"), fontsize=9)
     manejadores, etiquetas = ejes[0, 0].get_legend_handles_labels()
     fig.legend(manejadores, etiquetas, loc="upper center", ncol=5, fontsize=10,
                bbox_to_anchor=(0.5, 0.985))
@@ -203,13 +211,18 @@ def galeria_por_zona():
     for zona in load_selected_zones()["zonas"]:
         rutas.append(figura_rejilla(
             dias_de_zona(zona), f"galeria/{zona}.png",
-            f"{zona.replace('_', ' ').title()}: dieciséis días al azar, con calendario "
-            "para todos",
-            "Escenarios calibrados por nivel y bloque de horas con los 100 días previos. "
-            "Línea gruesa: mediana de cada método; sombra: banda del 90% por hora; línea "
-            "negra: precio observado. Arriba a la izquierda, cuántas de las 24 horas "
-            f"cayeron dentro de la banda de cada método. Semilla fija ({SEMILLA_REJILLA}) "
-            "por zona; meses distintos.", dpi=90, ordenar=True))
+            t(f"{zona.replace('_', ' ').title()}: dieciséis días al azar, con calendario "
+              "para todos", f"{zona.replace('_', ' ').title()}: sixteen random days, "
+              "with calendar for all"),
+            t("Escenarios calibrados por nivel y bloque de horas con los 100 días previos. "
+              "Línea gruesa: mediana de cada método; sombra: banda del 90% por hora; línea "
+              "negra: precio observado. Arriba a la izquierda, cuántas de las 24 horas "
+              f"cayeron dentro de la banda de cada método. Semilla fija ({SEMILLA_REJILLA}) "
+              "por zona; meses distintos.", "Scenarios calibrated by level and hour block "
+              "with the previous 100 days. Thick line: median of each method; shading: "
+              "hourly 90% band; black line: observed price. At the top left, how many of "
+              "the 24 hours fell inside the band of each method. Fixed seed "
+              f"({SEMILLA_REJILLA}) per zone; different months."), dpi=90, ordenar=True))
         fc.calibrados.cache_clear()
         fc._cargados.cache_clear()
         print("escrito", rutas[-1], flush=True)
@@ -227,14 +240,17 @@ def figura_por_hora():
                    pd.read_csv(RESULTS / "calibrados_por_hora_err_cal.csv")])
     h = h.groupby(["metodo", "variante", "hora"])[["cubre", "ancho", "n"]].sum()
     h["cubre"], h["ancho"] = h.cubre / h.n, h.ancho / h.n
-    estilos = {"crudo": ("sin calibrar", "#9e9e9e", ":"),
-               "proporcional": ("ajuste lineal", "#ef6c00", "--"),
-               "nivel": ("por nivel", "#1e88e5", "-."),
-               "nivel_bloque": ("por nivel y bloque de horas", "#5e35b1", "-")}
+    estilos = {"crudo": (t("sin calibrar", "uncalibrated"), "#9e9e9e", ":"),
+               "proporcional": (t("ajuste lineal", "linear calibration"), "#ef6c00", "--"),
+               "nivel": (t("por nivel", "by level"), "#1e88e5", "-."),
+               "nivel_bloque": (t("por nivel y bloque de horas", "by level and hour block"),
+                                "#5e35b1", "-")}
     fig, ejes = plt.subplots(2, 2, figsize=(13, 7.5), sharex=True)
     for col, (metodo, titulo) in enumerate([
-            ("t0-beta+errores-cal7", "t0-beta, errores con calendario"),
-            ("Analog-mezcla-cal7", "Analog-mix con calendario")]):
+            ("t0-beta+errores-cal7", t("t0-beta, errores con calendario",
+                                       "t0-beta, errors with calendar")),
+            ("Analog-mezcla-cal7", t("Analog-mix con calendario",
+                                     "Analog-mix with calendar"))]):
         a = h.loc[metodo]
         for v, (nombre, color, ls) in estilos.items():
             x = a.loc[v].index + 1
@@ -242,9 +258,9 @@ def figura_por_hora():
             ejes[0, col].plot(x, a.loc[v].ancho, color=color, ls=ls, lw=ancho, label=nombre)
             ejes[1, col].plot(x, a.loc[v].cubre, color=color, ls=ls, lw=ancho, label=nombre)
         ejes[1, col].axhline(0.90, color="black", lw=1)
-        ejes[1, col].text(1, 0.903, "lo prometido: 0.90", fontsize=8)
+        ejes[1, col].text(1, 0.903, t("lo prometido: 0.90", "promised: 0.90"), fontsize=8)
         ejes[0, col].set_title(titulo, fontsize=11)
-        ejes[1, col].set_xlabel("hora del día")
+        ejes[1, col].set_xlabel(t("hora del día", "hour of the day"))
         for e in ejes[:, col]:
             e.grid(alpha=0.25, lw=0.5)
             for x0, x1 in [(1, 6), (19, 22)]:
@@ -252,13 +268,18 @@ def figura_por_hora():
                           lw=0)
     for e in ejes[0]:
         lo, hi = e.get_ylim()
-        e.text(1.3, lo + 0.04 * (hi - lo), "madrugada", fontsize=8, color="#1565c0")
-        e.text(19.2, lo + 0.04 * (hi - lo), "pico de la tarde", fontsize=8, color="#e65100")
-    ejes[0, 0].set_ylabel("ancho medio del intervalo de 90%,\npesos por MWh")
-    ejes[1, 0].set_ylabel("cobertura por hora")
+        e.text(1.3, lo + 0.04 * (hi - lo), t("madrugada", "early morning"), fontsize=8,
+               color="#1565c0")
+        e.text(19.2, lo + 0.04 * (hi - lo), t("pico de la tarde", "afternoon peak"),
+               fontsize=8, color="#e65100")
+    ejes[0, 0].set_ylabel(t("ancho medio del intervalo de 90%,\npesos por MWh",
+                            "mean width of the 90% interval,\npesos per MWh"))
+    ejes[1, 0].set_ylabel(t("cobertura por hora", "hourly coverage"))
     ejes[0, 0].legend(fontsize=8.5, loc="upper center", bbox_to_anchor=(0.45, 1.0))
-    fig.suptitle("Con calendario: ancho y cobertura por hora con cada calibración, 25 zonas, "
-                 "abril 2021 a febrero 2026", fontsize=12)
+    fig.suptitle(t("Con calendario: ancho y cobertura por hora con cada calibración, "
+                   "25 zonas, abril 2021 a febrero 2026", "With calendar: width and "
+                   "coverage by hour with each calibration, 25 zones, April 2021 to "
+                   "February 2026"), fontsize=12)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     ruta = FIGURAS / "figura_ancho_por_hora_calendario.png"
     fig.savefig(ruta, bbox_inches="tight", dpi=150)
@@ -267,50 +288,78 @@ def figura_por_hora():
 
 
 def main():
-    comun = ("Escenarios calibrados por nivel y bloque de horas con los 100 días previos. "
-             "ARRIBA: mediana en línea gruesa y banda del 90% por hora (delgada, borde de "
-             "arriba; punteada, borde de abajo). ABAJO: intervalo del 90% del COSTO DEL DÍA (comprar 1 MWh "
-             "en cada hora), calculado sumando cada escenario; el punto es la mediana y "
-             "la línea negra, el costo real. ")
+    comun = t("Escenarios calibrados por nivel y bloque de horas con los 100 días previos. "
+              "ARRIBA: mediana en línea gruesa y banda del 90% por hora (delgada, borde de "
+              "arriba; punteada, borde de abajo). ABAJO: intervalo del 90% del COSTO DEL DÍA (comprar 1 MWh "
+              "en cada hora), calculado sumando cada escenario; el punto es la mediana y "
+              "la línea negra, el costo real. ",
+              "Scenarios calibrated by level and hour block with the previous 100 days. "
+              "TOP: median in a thick line and hourly 90% band (thin line, upper edge; "
+              "dotted line, lower edge). BOTTOM: 90% interval of the DAILY COST (buying "
+              "1 MWh in each hour), computed by summing each scenario; the dot is the "
+              "median and the black line, the actual cost. ")
     _con(CON_CALENDARIO, COLORES_CAL)
     r1 = fc.una_figura(fc.dias_anunciados_caros(), "figura_anunciados_caros_calendario.png",
-                       "Días que se anunciaban caros, con calendario para todos",
-                       comun + "Regla sin mirar el resultado: decil más caro del último día "
+                       t("Días que se anunciaban caros, con calendario para todos",
+                         "Days announced as expensive, with calendar for all"),
+                       comun + t("Regla sin mirar el resultado: decil más caro del último día "
                        "publicado al decidir; el más caro de cada zona y mes. Son los "
-                       "mismos días de la figura sin calendario.")
+                       "mismos días de la figura sin calendario.", "Rule that does not look "
+                       "at the result: most expensive decile of the last day published at "
+                       "decision time; the most expensive of each zone and month. These are "
+                       "the same days as in the figure without calendar."))
     fc.calibrados.cache_clear()
     _con(DOMINGOS, COLORES_CAL)
     r2 = fc.una_figura(domingos(), "figura_domingos_calendario.png",
-                       "Cuatro domingos: el análogo sin y con calendario",
-                       comun + "Días fijados antes de mirar el resultado: el primer domingo no "
+                       t("Cuatro domingos: el análogo sin y con calendario",
+                         "Four Sundays: the analog method without and with calendar"),
+                       comun + t("Días fijados antes de mirar el resultado: el primer domingo no "
                        "festivo de marzo, junio, septiembre y diciembre de 2024, en cuatro "
-                       "zonas de regiones distintas.")
+                       "zonas de regiones distintas.", "Days fixed before looking at the "
+                       "result: the first non-holiday Sunday of March, June, September and "
+                       "December 2024, in four zones from different regions."))
     fc.calibrados.cache_clear()
     _con(DOMINGOS, COLORES_CAL)
     r4 = fc.una_figura(festivos_elegidos(), "figura_festivos_calendario.png",
-                       "Cuatro festivos entre semana: el análogo sin y con calendario",
-                       comun + "Festivos escogidos antes de mirar el resultado: 1 de mayo de "
+                       t("Cuatro festivos entre semana: el análogo sin y con calendario",
+                         "Four weekday holidays: the analog method without and with "
+                         "calendar"),
+                       comun + t("Festivos escogidos antes de mirar el resultado: 1 de mayo de "
                        "2023, 16 de septiembre de 2024, 25 de diciembre de 2024 y 1 de enero "
                        "de 2025, en cuatro zonas de regiones distintas. El filtro trata el "
                        "festivo como domingo; la mediana de t0-beta no sabe que es festivo, "
-                       "aunque sus errores sí vienen de domingos y festivos pasados.")
+                       "aunque sus errores sí vienen de domingos y festivos pasados.",
+                       "Holidays chosen before looking at the result: 1 May 2023, "
+                       "16 September 2024, 25 December 2024 and 1 January 2025, in four zones "
+                       "from different regions. The filter treats the holiday as a Sunday; "
+                       "the median of t0-beta does not know it is a holiday, although its "
+                       "errors do come from past Sundays and holidays."))
     fc.calibrados.cache_clear()
     _con(CON_CALENDARIO, COLORES_CAL)
     r5 = fc.una_figura(dias_sorteados(), "figura_dias_sorteados_calendario.png",
-                       "Cuatro días cualquiera, sorteados, con calendario para todos",
-                       comun + f"Días sorteados del tramo de prueba con semilla fija "
-                       f"({SEMILLA_SORTEO}), de zonas y meses distintos.")
+                       t("Cuatro días cualquiera, sorteados, con calendario para todos",
+                         "Four ordinary days, drawn at random, with calendar for all"),
+                       comun + t(f"Días sorteados del tramo de prueba con semilla fija "
+                       f"({SEMILLA_SORTEO}), de zonas y meses distintos.", f"Days drawn from "
+                       f"the test period with a fixed seed ({SEMILLA_SORTEO}), from different "
+                       f"zones and months."))
     fc.calibrados.cache_clear()
     _con(CON_CALENDARIO, COLORES_CAL)
     r6 = figura_rejilla(
         dias_sorteados(24, semilla=SEMILLA_REJILLA, excluir=dias_sorteados()),
         "figura_rejilla_dias_sorteados.png",
-        "Dieciséis días cualquiera, sorteados, con calendario para todos",
-        "Escenarios calibrados por nivel y bloque de horas con los 100 días previos. Línea "
-        "gruesa: mediana de cada método; sombra: banda del 90% por hora; línea negra: "
-        "precio observado. Arriba a la izquierda, cuántas de las 24 horas cayeron dentro "
-        f"de la banda de cada método. Días sorteados con semilla fija ({SEMILLA_REJILLA}), "
-        "de meses distintos, distintos de los de la galería de cuatro días.")
+        t("Dieciséis días cualquiera, sorteados, con calendario para todos",
+          "Sixteen ordinary days, drawn at random, with calendar for all"),
+        t("Escenarios calibrados por nivel y bloque de horas con los 100 días previos. Línea "
+          "gruesa: mediana de cada método; sombra: banda del 90% por hora; línea negra: "
+          "precio observado. Arriba a la izquierda, cuántas de las 24 horas cayeron dentro "
+          f"de la banda de cada método. Días sorteados con semilla fija ({SEMILLA_REJILLA}), "
+          "de meses distintos, distintos de los de la galería de cuatro días.",
+          "Scenarios calibrated by level and hour block with the previous 100 days. Thick "
+          "line: median of each method; shading: hourly 90% band; black line: observed "
+          "price. At the top left, how many of the 24 hours fell inside the band of each "
+          f"method. Days drawn with a fixed seed ({SEMILLA_REJILLA}), from different "
+          "months, different from those of the four-day gallery."))
     r3 = figura_por_hora()
     for r in (r1, r2, r3, r4, r5, r6):
         print("escrito", r)

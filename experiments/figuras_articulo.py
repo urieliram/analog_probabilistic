@@ -32,17 +32,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from experiments.calibra_escenarios import DETALLE, NIVELES  # noqa: E402
 from experiments.curva_tau import compara  # noqa: E402
+from experiments.idioma import carpeta, t  # noqa: E402
 from experiments.protocol import RESULTS  # noqa: E402
 
-FIGURAS = RESULTS.parent / "figuras"
+FIGURAS = carpeta(RESULTS.parent / "figuras")
 PUBLICACION = RESULTS / "publicacion"
 VERDE = "#1b5e20"
 MAGENTA = "#d81b60"
-SIN_CALENDARIO = [("LEAR", "LEAR"), ("t0-beta+errores", "t0-beta, de sus errores"),
-                  ("PatchTST-FM+errores", "PatchTST-FM, de sus errores")]
+SIN_CALENDARIO = [("LEAR", "LEAR"),
+                  ("t0-beta+errores", t("t0-beta, de sus errores",
+                                        "t0-beta, from its errors")),
+                  ("PatchTST-FM+errores", t("PatchTST-FM, de sus errores",
+                                            "PatchTST-FM, from its errors"))]
 CON_CALENDARIO = [("LEAR", "LEAR"),
-                  ("t0-beta+errores-cal7", "t0-beta, errores con calendario"),
-                  ("PatchTST-FM+errores-cal7", "PatchTST-FM, errores con calendario")]
+                  ("t0-beta+errores-cal7", t("t0-beta, errores con calendario",
+                                             "t0-beta, errors with calendar")),
+                  ("PatchTST-FM+errores-cal7", t("PatchTST-FM, errores con calendario",
+                                                 "PatchTST-FM, errors with calendar"))]
 DIAS = ["lunes", "martes a viernes", "sábado", "domingo"]
 
 
@@ -114,11 +120,14 @@ def figura_curva(series, rivales, sujeto, titulo, nombre):
             eje.plot(g.tau, g.pct, "o-", ms=3, color=color, label=nombre_serie)
             eje.fill_between(g.tau, g.pct_bajo, g.pct_alto, color=color, alpha=0.15)
         eje.axhline(0, color="black", lw=0.8)
-        eje.set_title(f"contra {etiqueta}", fontsize=10.5)
-        eje.set_xlabel("τ (parte de la distribución del costo del día)")
+        eje.set_title(t(f"contra {etiqueta}", f"against {etiqueta}"), fontsize=10.5)
+        eje.set_xlabel(t("τ (parte de la distribución del costo del día)",
+                         "τ (part of the distribution of the daily cost)"))
         eje.grid(alpha=0.3)
-    ejes[0].set_ylabel(f"{sujeto} menos rival,\n% del rival (abajo de cero gana el "
-                       f"{'análogo' if len(series) == 1 else 'método'})")
+    ejes[0].set_ylabel(t(f"{sujeto} menos rival,\n% del rival (abajo de cero gana el "
+                         f"{'análogo' if len(series) == 1 else 'método'})",
+                         f"{sujeto} minus rival,\n% of the rival (below zero the "
+                         f"{'analog method' if len(series) == 1 else 'method'} wins)"))
     if len(series) > 1:
         ejes[0].legend(fontsize=8.5, loc="lower left")
     fig.suptitle(titulo, fontsize=11)
@@ -133,16 +142,24 @@ def figura_calendario(tab):
     d = tab.loc[DIAS]
     colores = {"Analog-mix": "#9e9e9e", "Analog-mix con calendario": VERDE,
                "LEAR": "#ef6c00", "t0-beta": "#5e35b1"}
+    ## los días y los métodos son las llaves del cuadro que se guarda en CSV: se traducen
+    ## sólo al dibujarlos, para que el cuadro salga igual en los dos idiomas
+    en = {"Analog-mix": "Analog-mix", "Analog-mix con calendario": "Analog-mix with calendar",
+          "LEAR": "LEAR", "t0-beta": "t0-beta", "lunes": "Monday",
+          "martes a viernes": "Tuesday to Friday", "sábado": "Saturday",
+          "domingo": "Sunday"}
     fig, eje = plt.subplots(figsize=(10, 4.6))
     x, ancho = np.arange(len(d)), 0.2
     for i, metodo in enumerate(d.columns):
         posiciones = x + (i - 1.5) * ancho
-        eje.bar(posiciones, d[metodo], ancho, label=metodo, color=colores[metodo])
+        eje.bar(posiciones, d[metodo], ancho, label=t(metodo, en[metodo]),
+                color=colores[metodo])
         for xi, v in zip(posiciones, d[metodo]):
             eje.text(xi, v + 2, f"{v:.0f}", ha="center", fontsize=7.5)
     eje.set_xticks(x)
-    eje.set_xticklabels(d.index)
-    eje.set_ylabel("error absoluto medio del centro,\npesos por MWh")
+    eje.set_xticklabels([t(dia, en[dia]) for dia in d.index])
+    eje.set_ylabel(t("error absoluto medio del centro,\npesos por MWh",
+                     "mean absolute error of the center,\npesos per MWh"))
     eje.legend(fontsize=8.5, ncol=4, loc="upper center", bbox_to_anchor=(0.5, 1.13))
     eje.grid(alpha=0.3, axis="y")
     eje.set_ylim(0, 240)
@@ -165,13 +182,18 @@ def main():
     print(tab.round(1).to_string())
     for ruta in (
             figura_curva([(c1, "Analog-mix", VERDE)], SIN_CALENDARIO, "Analog-mix",
-                         "Escenarios calibrados por nivel y bloque de horas, todos los "
-                         "métodos igual", "figura_curva_tau_calibrada.png"),
-            figura_curva([(c2, "Analog-mix con calendario", VERDE),
-                          (c3, "t0-beta + análogo (campeón)", MAGENTA)],
-                         CON_CALENDARIO, "Método",
-                         "Todos calibrados por nivel y bloque de horas, y con la misma "
-                         "información de calendario", "figura_curva_tau_calendario.png"),
+                         t("Escenarios calibrados por nivel y bloque de horas, todos los "
+                           "métodos igual", "Scenarios calibrated by level and hour block, "
+                           "all methods the same way"), "figura_curva_tau_calibrada.png"),
+            figura_curva([(c2, t("Analog-mix con calendario", "Analog-mix with calendar"),
+                           VERDE),
+                          (c3, t("t0-beta + análogo (campeón)",
+                                 "t0-beta + analog (champion)"), MAGENTA)],
+                         CON_CALENDARIO, t("Método", "Method"),
+                         t("Todos calibrados por nivel y bloque de horas, y con la misma "
+                           "información de calendario", "All calibrated by level and hour "
+                           "block, and with the same calendar information"),
+                         "figura_curva_tau_calendario.png"),
             figura_calendario(tab)):
         print("escrito", ruta)
 
