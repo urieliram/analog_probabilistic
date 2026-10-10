@@ -39,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import experiments.figuras_calibradas as fc  # noqa: E402
 from experiments.idioma import carpeta, t  # noqa: E402
+from experiments.guardar import guarda  # noqa: E402
 from experiments.protocol import RESULTS  # noqa: E402
 from experiments.run_calendario import tipo_de_dia  # noqa: E402
 
@@ -176,7 +177,7 @@ def figura_rejilla(dias, nombre, titulo, nota, dpi=130, ordenar=False):
     fig.tight_layout(rect=[0, 0.025, 1, 0.965])
     ruta = FIGURAS / nombre
     ruta.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(ruta, bbox_inches="tight", dpi=dpi)
+    guarda(fig, ruta, bbox_inches="tight", dpi=dpi)
     plt.close(fig)
     return ruta
 
@@ -282,7 +283,7 @@ def figura_por_hora():
                    "February 2026"), fontsize=12)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     ruta = FIGURAS / "figura_ancho_por_hora_calendario.png"
-    fig.savefig(ruta, bbox_inches="tight", dpi=150)
+    guarda(fig, ruta, bbox_inches="tight", dpi=150)
     plt.close(fig)
     return ruta
 

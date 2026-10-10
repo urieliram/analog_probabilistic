@@ -29,6 +29,7 @@ from experiments.confirmacion_2026 import INICIO_PROSPECTIVO  # noqa: E402
 from experiments.conformal import VENTANA_RODANTE  # noqa: E402
 from experiments.escenarios_de_errores_calendario import VENTANA_ERRORES  # noqa: E402
 from experiments.idioma import carpeta, t  # noqa: E402
+from experiments.guardar import guarda  # noqa: E402
 from experiments.protocol import (INSPECTED_END, INSPECTED_START,  # noqa: E402
                                   RESULTS, SEARCH_YEARS, SELECTION_END,
                                   SELECTION_START, TEST_END, TEST_START)
@@ -195,7 +196,7 @@ def main():
     fig.tight_layout(h_pad=2.2)
     FIGURAS.mkdir(exist_ok=True)
     ruta = FIGURAS / "figura_tramos.png"
-    fig.savefig(ruta, dpi=160, bbox_inches="tight")
+    guarda(fig, ruta, dpi=160, bbox_inches="tight")
     plt.close(fig)
     print("escrito", ruta)
 

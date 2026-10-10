@@ -37,6 +37,7 @@ from experiments.dilema import con_dia_anterior, deciles  # noqa: E402
 from experiments.figuras_picos import elige_dias  # noqa: E402
 from experiments.forecast_store import member_columns, member_matrix  # noqa: E402
 from experiments.idioma import carpeta, t  # noqa: E402
+from experiments.guardar import guarda  # noqa: E402
 from experiments.protocol import RESULTS  # noqa: E402
 
 FIGURAS = carpeta(RESULTS.parent / "figuras")
@@ -172,7 +173,7 @@ def una_figura(dias, nombre, titulo, nota):
     fig.tight_layout(rect=[0, 0, 1, 0.97])
     FIGURAS.mkdir(exist_ok=True)
     ruta = FIGURAS / nombre
-    fig.savefig(ruta, bbox_inches="tight", dpi=150)
+    guarda(fig, ruta, bbox_inches="tight", dpi=150)
     plt.close(fig)
     return ruta
 
@@ -262,7 +263,7 @@ def figura_por_hora():
                    "coverage by hour, 25 zones, April 2021 to February 2026"), fontsize=12)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     ruta = FIGURAS / "figura_ancho_por_hora_ajuste_bloques.png"
-    fig.savefig(ruta, bbox_inches="tight", dpi=150)
+    guarda(fig, ruta, bbox_inches="tight", dpi=150)
     plt.close(fig)
     return ruta
 

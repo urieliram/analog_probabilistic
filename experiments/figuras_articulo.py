@@ -33,6 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from experiments.calibra_escenarios import DETALLE, NIVELES  # noqa: E402
 from experiments.curva_tau import compara  # noqa: E402
 from experiments.idioma import carpeta, t  # noqa: E402
+from experiments.guardar import guarda  # noqa: E402
 from experiments.protocol import RESULTS  # noqa: E402
 
 FIGURAS = carpeta(RESULTS.parent / "figuras")
@@ -133,7 +134,7 @@ def figura_curva(series, rivales, sujeto, titulo, nombre):
     fig.suptitle(titulo, fontsize=11)
     fig.tight_layout()
     ruta = FIGURAS / nombre
-    fig.savefig(ruta, dpi=160)
+    guarda(fig, ruta, dpi=160)
     plt.close(fig)
     return ruta
 
@@ -165,7 +166,7 @@ def figura_calendario(tab):
     eje.set_ylim(0, 240)
     fig.tight_layout()
     ruta = FIGURAS / "figura_calendario.png"
-    fig.savefig(ruta, dpi=160)
+    guarda(fig, ruta, dpi=160)
     plt.close(fig)
     return ruta
 
